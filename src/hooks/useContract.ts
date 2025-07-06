@@ -1,0 +1,601 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ethers } from 'ethers';
+import { CONTRACT_CONFIG, REFERRAL_SYSTEM_ABI, REFERRAL_TOKEN_ABI } from '../config/contracts';
+import { User, Referral, LeaderboardEntry, PlatformStats, ContractEvent } from '../types';
+import { useWallet } from './useWallet';
+import toast from 'react-hot-toast';
+
+export const useContract = () => {
+  const { provider, signer, address, isConnected, isCorrectNetwork } = useWallet();
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [events, setEvents] = useState<ContractEvent[]>([]);
+  const [contractsDeployed, setContractsDeployed] = useState(false);
+  const eventListenersRef = useRef<{ [key: string]: any }>({});
+  const contractCheckRef = useRef<boolean>(false);
+  const toastShownRef = useRef<Set<string>>(new Set());
+
+  // Persistent referral code mapping using localStorage
+  const getReferralCodeMapping = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('referralCodeMapping');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const setReferralCodeMapping = useCallback((mapping: { [code: string]: string }) => {
+    try {
+      localStorage.setItem('referralCodeMapping', JSON.stringify(mapping));
+    } catch (error) {
+      console.error('Failed to save referral code mapping:', error);
+    }
+  }, []);
+
+  // Check if contracts are deployed
+  useEffect(() => {
+    const checkContracts = async () => {
+      if (!provider || !isCorrectNetwork || contractCheckRef.current) return;
+      
+      contractCheckRef.current = true;
+      
+      try {
+        const systemCode = await provider.getCode(CONTRACT_CONFIG.referralSystemAddress);
+        const tokenCode = await provider.getCode(CONTRACT_CONFIG.referralTokenAddress);
+        
+        const deployed = systemCode !== '0x' && tokenCode !== '0x';
+        setContractsDeployed(deployed);
+        
+        const toastKey = `contracts-${deployed ? 'connected' : 'not-found'}`;
+        
+        if (deployed && !toastShownRef.current.has(toastKey)) {
+          console.log('✅ Contracts successfully detected at:');
+          console.log('ReferralSystem:', CONTRACT_CONFIG.referralSystemAddress);
+          console.log('ReferralToken:', CONTRACT_CONFIG.referralTokenAddress);
+          toast.success('Smart contracts connected successfully!', {
+            duration: 3000,
+            icon: '🎉',
+            id: toastKey,
+          });
+          toastShownRef.current.add(toastKey);
+        } else if (!deployed && !toastShownRef.current.has(toastKey)) {
+          console.warn('❌ Contracts not found at specified addresses');
+          toast.error('Smart contracts not found at specified addresses', {
+            duration: 5000,
+            icon: '⚠️',
+            id: toastKey,
+          });
+          toastShownRef.current.add(toastKey);
+        }
+      } catch (error) {
+        console.error('Error checking contract deployment:', error);
+        setContractsDeployed(false);
+        const toastKey = 'contracts-error';
+        if (!toastShownRef.current.has(toastKey)) {
+          toast.error('Error connecting to smart contracts', {
+            duration: 5000,
+            icon: '❌',
+            id: toastKey,
+          });
+          toastShownRef.current.add(toastKey);
+        }
+      }
+    };
+
+    checkContracts();
+  }, [provider, isCorrectNetwork]);
+
+  // Reset contract check when network changes
+  useEffect(() => {
+    contractCheckRef.current = false;
+    toastShownRef.current.clear();
+  }, [isCorrectNetwork]);
+
+  const getReferralSystemContract = useCallback(() => {
+    if (!provider || !isCorrectNetwork || !contractsDeployed) return null;
+    return new ethers.Contract(
+      CONTRACT_CONFIG.referralSystemAddress,
+      REFERRAL_SYSTEM_ABI,
+      signer || provider
+    );
+  }, [provider, signer, isCorrectNetwork, contractsDeployed]);
+
+  const getReferralTokenContract = useCallback(() => {
+    if (!provider || !isCorrectNetwork || !contractsDeployed) return null;
+    return new ethers.Contract(
+      CONTRACT_CONFIG.referralTokenAddress,
+      REFERRAL_TOKEN_ABI,
+      signer || provider
+    );
+  }, [provider, signer, isCorrectNetwork, contractsDeployed]);
+
+  const generateReferralCode = useCallback((address: string): string => {
+    // Generate a deterministic referral code based on address
+    const hash = ethers.keccak256(ethers.toUtf8Bytes(address));
+    return `REF_${hash.slice(2, 8).toUpperCase()}`;
+  }, []);
+
+  // Register referral code mapping with persistence
+  const registerReferralCode = useCallback((address: string, code: string) => {
+    const mapping = getReferralCodeMapping();
+    mapping[code] = address;
+    setReferralCodeMapping(mapping);
+  }, [getReferralCodeMapping, setReferralCodeMapping]);
+
+  // Get address from referral code with persistence
+  const getAddressFromReferralCode = useCallback((code: string): string | null => {
+    const mapping = getReferralCodeMapping();
+    return mapping[code] || null;
+  }, [getReferralCodeMapping]);
+
+  // Simulate backend service for referral code validation
+  const validateReferralCode = useCallback(async (code: string): Promise<{ valid: boolean; referrerAddress?: string }> => {
+    // First check local storage
+    const localAddress = getAddressFromReferralCode(code);
+    if (localAddress) {
+      return { valid: true, referrerAddress: localAddress };
+    }
+
+    // In a real application, this would be an API call to your backend
+    // For demo purposes, we'll generate some mock valid codes
+    const mockValidCodes = [
+      'REF_ABC123',
+      'REF_DEF456', 
+      'REF_GHI789',
+      'REF_JKL012'
+    ];
+
+    if (mockValidCodes.includes(code)) {
+      // Generate a mock address for demo
+      const mockAddress = ethers.Wallet.createRandom().address;
+      registerReferralCode(mockAddress, code);
+      return { valid: true, referrerAddress: mockAddress };
+    }
+
+    return { valid: false };
+  }, [getAddressFromReferralCode, registerReferralCode]);
+
+  const getUserData = useCallback(async (userAddress: string): Promise<User | null> => {
+    const contract = getReferralSystemContract();
+    const referralCode = generateReferralCode(userAddress);
+    
+    // Register the mapping
+    registerReferralCode(userAddress, referralCode);
+    
+    if (!contract) {
+      return {
+        address: userAddress,
+        referralCode,
+        totalReferrals: 0,
+        totalRewards: '0',
+        pendingRewards: '0',
+        isReferred: false,
+        lastReferralTime: 0,
+        isEligible: true,
+      };
+    }
+
+    try {
+      const [
+        [totalRefs, totalRewards, lastReferral, isReferred],
+        isEligible
+      ] = await Promise.all([
+        contract.getUserStats(userAddress),
+        contract.isEligibleForReferral(userAddress)
+      ]);
+      
+      return {
+        address: userAddress,
+        referralCode,
+        totalReferrals: Number(totalRefs),
+        totalRewards: ethers.formatEther(totalRewards),
+        pendingRewards: '0',
+        isReferred,
+        lastReferralTime: Number(lastReferral),
+        isEligible,
+      };
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      const toastKey = `user-data-error-${userAddress}`;
+      if (!toastShownRef.current.has(toastKey)) {
+        toast.error('Error fetching user data from contract', {
+          duration: 4000,
+          icon: '⚠️',
+          id: toastKey,
+        });
+        toastShownRef.current.add(toastKey);
+      }
+      return null;
+    }
+  }, [getReferralSystemContract, generateReferralCode, registerReferralCode]);
+
+  const processReferral = useCallback(async (referralCode: string): Promise<boolean> => {
+    if (!signer || !address || !isCorrectNetwork) {
+      toast.error('Please connect your wallet to Sepolia network', {
+        duration: 4000,
+        icon: '🔗',
+        id: 'wallet-not-connected',
+      });
+      return false;
+    }
+
+    const contract = getReferralSystemContract();
+    if (!contract) {
+      toast.error('Smart contracts not available', {
+        duration: 4000,
+        icon: '⚠️',
+        id: 'contracts-not-available',
+      });
+      return false;
+    }
+
+    setLoading(true);
+    
+    try {
+      // Validate referral code
+      const validation = await validateReferralCode(referralCode);
+      if (!validation.valid || !validation.referrerAddress) {
+        toast.error('Invalid referral code. Please check the code and try again.', {
+          duration: 5000,
+          icon: '❌',
+          id: 'invalid-referral-code',
+        });
+        return false;
+      }
+
+      const referrerAddress = validation.referrerAddress;
+
+      if (referrerAddress.toLowerCase() === address.toLowerCase()) {
+        toast.error('You cannot refer yourself!', {
+          duration: 4000,
+          icon: '🚫',
+          id: 'self-referral',
+        });
+        return false;
+      }
+
+      // Check if user has already been referred
+      const hasBeenReferred = await contract.hasBeenReferred(address);
+      if (hasBeenReferred) {
+        toast.error('You have already been referred by someone else!', {
+          duration: 4000,
+          icon: '⚠️',
+          id: 'already-referred',
+        });
+        return false;
+      }
+
+      // Check if referrer is eligible
+      const isReferrerEligible = await contract.isEligibleForReferral(referrerAddress);
+      if (!isReferrerEligible) {
+        toast.error('Referrer is not eligible to make referrals at this time (rate limited)', {
+          duration: 4000,
+          icon: '⏰',
+          id: 'referrer-not-eligible',
+        });
+        return false;
+      }
+
+      const processingToastId = toast.loading('Processing referral...', {
+        icon: '⏳',
+      });
+
+      const tx = await contract.processReferral(address, referrerAddress);
+      
+      toast.loading('Waiting for transaction confirmation...', {
+        id: processingToastId,
+        icon: '⛓️',
+      });
+      
+      const receipt = await tx.wait();
+      
+      toast.success(`Referral processed successfully! 🎉\nYou earned 500 REFT tokens!`, {
+        duration: 6000,
+        icon: '🎊',
+        id: processingToastId,
+      });
+
+      // Refresh user data
+      if (address) {
+        getUserData(address).then(setUser);
+      }
+
+      return true;
+      
+    } catch (error: any) {
+      console.error('Error processing referral:', error);
+      
+      let errorMessage = 'Failed to process referral';
+      
+      if (error.reason) {
+        errorMessage = error.reason;
+      } else if (error.message.includes('user rejected')) {
+        errorMessage = 'Transaction was rejected by user';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas fees';
+      } else if (error.message.includes('UserAlreadyReferred')) {
+        errorMessage = 'You have already been referred!';
+      } else if (error.message.includes('SelfReferralNotAllowed')) {
+        errorMessage = 'You cannot refer yourself!';
+      } else if (error.message.includes('ReferralTooSoon')) {
+        errorMessage = 'Referrer must wait before making another referral';
+      } else if (error.message.includes('MaxReferralsExceeded')) {
+        errorMessage = 'Referrer has reached maximum referral limit';
+      }
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+        icon: '❌',
+        id: 'referral-error',
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData]);
+
+  const getReferralHistory = useCallback(async (userAddress: string): Promise<Referral[]> => {
+    const contract = getReferralSystemContract();
+    if (!contract) return [];
+
+    try {
+      const referrals = await contract.getReferrals(userAddress);
+      return referrals.map((ref: any) => ({
+        referee: ref.referee,
+        referrer: ref.referrer,
+        timestamp: Number(ref.timestamp),
+        referrerReward: ethers.formatEther(ref.referrerReward),
+        refereeReward: ethers.formatEther(ref.refereeReward),
+      }));
+    } catch (error) {
+      console.error('Error fetching referral history:', error);
+      return [];
+    }
+  }, [getReferralSystemContract]);
+
+  const getTokenBalance = useCallback(async (userAddress: string): Promise<string> => {
+    const contract = getReferralTokenContract();
+    if (!contract) return '0';
+
+    try {
+      const balance = await contract.balanceOf(userAddress);
+      return ethers.formatEther(balance);
+    } catch (error) {
+      console.error('Error fetching token balance:', error);
+      return '0';
+    }
+  }, [getReferralTokenContract]);
+
+  const getLeaderboard = useCallback(async (): Promise<LeaderboardEntry[]> => {
+    if (!contractsDeployed) {
+      return [];
+    }
+    
+    try {
+      const contract = getReferralSystemContract();
+      if (!contract) return [];
+      
+      // Query recent events to build a basic leaderboard
+      const filter = contract.filters.ReferralProcessed();
+      const events = await contract.queryFilter(filter, -10000); // Last 10k blocks
+      
+      // Process events to create leaderboard
+      const referrerStats: { [address: string]: { count: number; rewards: bigint } } = {};
+      
+      for (const event of events) {
+        const referrer = event.args?.[1];
+        if (referrer) {
+          if (!referrerStats[referrer]) {
+            referrerStats[referrer] = { count: 0, rewards: BigInt(0) };
+          }
+          referrerStats[referrer].count++;
+          // Estimate rewards (1000 REFT per referral)
+          referrerStats[referrer].rewards += ethers.parseEther('1000');
+        }
+      }
+      
+      // Convert to leaderboard format
+      const leaderboard = Object.entries(referrerStats)
+        .map(([address, stats]) => ({
+          address,
+          referralCount: stats.count,
+          totalRewards: ethers.formatEther(stats.rewards),
+          rank: 0,
+        }))
+        .sort((a, b) => b.referralCount - a.referralCount)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+      
+      return leaderboard.slice(0, 10); // Top 10
+    } catch (error) {
+      console.error('Error building leaderboard:', error);
+      return [];
+    }
+  }, [contractsDeployed, getReferralSystemContract]);
+
+  const getPlatformStats = useCallback(async (): Promise<PlatformStats> => {
+    const contract = getReferralSystemContract();
+    if (!contract) {
+      return {
+        totalUsers: 0,
+        totalReferrals: 0,
+        totalRewardsDistributed: '0',
+        activeUsers24h: 0,
+        contractBalance: '0',
+      };
+    }
+
+    try {
+      const contractBalance = await contract.getContractBalance();
+      
+      // Query events to get real stats
+      const referralFilter = contract.filters.ReferralProcessed();
+      const rewardFilter = contract.filters.RewardsDistributed();
+      
+      const [referralEvents, rewardEvents] = await Promise.all([
+        contract.queryFilter(referralFilter, -10000),
+        contract.queryFilter(rewardFilter, -10000),
+      ]);
+      
+      // Calculate unique users
+      const uniqueUsers = new Set();
+      referralEvents.forEach(event => {
+        if (event.args) {
+          uniqueUsers.add(event.args[0]); // referee
+          uniqueUsers.add(event.args[1]); // referrer
+        }
+      });
+      
+      // Calculate total rewards
+      let totalRewards = BigInt(0);
+      rewardEvents.forEach(event => {
+        if (event.args) {
+          totalRewards += BigInt(event.args[1]);
+        }
+      });
+      
+      // Calculate active users in last 24h
+      const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+      const recentEvents = referralEvents.filter(event => {
+        return event.args && Number(event.args[2]) > oneDayAgo;
+      });
+      
+      const activeUsers = new Set();
+      recentEvents.forEach(event => {
+        if (event.args) {
+          activeUsers.add(event.args[0]);
+          activeUsers.add(event.args[1]);
+        }
+      });
+      
+      return {
+        totalUsers: uniqueUsers.size,
+        totalReferrals: referralEvents.length,
+        totalRewardsDistributed: ethers.formatEther(totalRewards),
+        activeUsers24h: activeUsers.size,
+        contractBalance: ethers.formatEther(contractBalance),
+      };
+    } catch (error) {
+      console.error('Error fetching platform stats:', error);
+      return {
+        totalUsers: 0,
+        totalReferrals: 0,
+        totalRewardsDistributed: '0',
+        activeUsers24h: 0,
+        contractBalance: '0',
+      };
+    }
+  }, [getReferralSystemContract]);
+
+  // Set up real-time event listeners
+  useEffect(() => {
+    const contract = getReferralSystemContract();
+    if (!contract || !isConnected || !isCorrectNetwork) return;
+
+    console.log('🔄 Setting up real-time event listeners...');
+
+    // Clean up existing listeners
+    Object.values(eventListenersRef.current).forEach(listener => {
+      if (listener && typeof listener.removeAllListeners === 'function') {
+        listener.removeAllListeners();
+      }
+    });
+
+    // Set up new listeners
+    const referralProcessedListener = contract.on('ReferralProcessed', (referee, referrer, timestamp, event) => {
+      console.log('🎉 ReferralProcessed event:', { referee, referrer, timestamp });
+      
+      if (address && (referee === address || referrer === address)) {
+        getUserData(address).then(setUser);
+        
+        const eventToastKey = `referral-event-${event.transactionHash}`;
+        if (!toastShownRef.current.has(eventToastKey)) {
+          if (referee === address) {
+            toast.success('Welcome! You earned 500 REFT tokens! 🎊', {
+              duration: 6000,
+              icon: '🎁',
+              id: eventToastKey,
+            });
+          } else {
+            toast.success('New referral! You earned 1000 REFT tokens! 🎉', {
+              duration: 6000,
+              icon: '💰',
+              id: eventToastKey,
+            });
+          }
+          toastShownRef.current.add(eventToastKey);
+        }
+      }
+      
+      setEvents(prev => [...prev, {
+        event: 'ReferralProcessed',
+        args: [referee, referrer, timestamp],
+        transactionHash: event.transactionHash,
+        blockNumber: event.blockNumber,
+      }]);
+    });
+
+    const rewardsDistributedListener = contract.on('RewardsDistributed', (user, amount, referralType, event) => {
+      console.log('💰 RewardsDistributed event:', { user, amount, referralType });
+      
+      if (address && user === address) {
+        getUserData(address).then(setUser);
+      }
+      
+      setEvents(prev => [...prev, {
+        event: 'RewardsDistributed',
+        args: [user, amount, referralType],
+        transactionHash: event.transactionHash,
+        blockNumber: event.blockNumber,
+      }]);
+    });
+
+    eventListenersRef.current = {
+      referralProcessed: referralProcessedListener,
+      rewardsDistributed: rewardsDistributedListener,
+    };
+
+    console.log('✅ Event listeners set up successfully');
+
+    return () => {
+      console.log('🧹 Cleaning up event listeners');
+      Object.values(eventListenersRef.current).forEach(listener => {
+        if (listener && typeof listener.removeAllListeners === 'function') {
+          listener.removeAllListeners();
+        }
+      });
+    };
+  }, [getReferralSystemContract, isConnected, isCorrectNetwork, address, getUserData]);
+
+  // Load user data when wallet connects
+  useEffect(() => {
+    if (isConnected && address && isCorrectNetwork) {
+      getUserData(address).then(setUser);
+    } else {
+      setUser(null);
+    }
+  }, [isConnected, address, isCorrectNetwork, getUserData]);
+
+  // Auto-register existing users' referral codes
+  useEffect(() => {
+    if (address && contractsDeployed) {
+      const code = generateReferralCode(address);
+      registerReferralCode(address, code);
+    }
+  }, [address, contractsDeployed, generateReferralCode, registerReferralCode]);
+
+  return {
+    loading,
+    user,
+    events,
+    contractsDeployed,
+    generateReferralCode,
+    processReferral,
+    getReferralHistory,
+    getTokenBalance,
+    getLeaderboard,
+    getPlatformStats,
+    getUserData,
+    validateReferralCode,
+  };
+};
