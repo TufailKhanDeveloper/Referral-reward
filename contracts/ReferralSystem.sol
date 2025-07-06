@@ -437,10 +437,10 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         return (referrerReward, refereeReward);
     }
     
-    /**
-     * @dev Get contract configuration
-     * @return Configuration values
-     */
+    // /**
+    //  * @dev Get contract configuration
+    //  * @return Configuration values
+    //  */
     function getConfig() external view returns (
         uint256 minInterval,
         uint256 maxReferrals,
