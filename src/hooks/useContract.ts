@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACT_CONFIG, REFERRAL_SYSTEM_ABI, REFERRAL_TOKEN_ABI } from '../config/contracts';
+import { CONTRACT_CONFIG, REFERRAL_SYSTEM_ABI, REFERRAL_TOKEN_ABI, CONTRACT_ERROR_MESSAGES } from '../config/contracts';
 import { User, Referral, LeaderboardEntry, PlatformStats, ContractEvent } from '../types';
 import { useWallet } from './useWallet';
 import toast from 'react-hot-toast';
@@ -31,6 +31,66 @@ export const useContract = () => {
     } catch (error) {
       console.error('Failed to save referral code mapping:', error);
     }
+  }, []);
+
+  // Enhanced error handling function
+  const handleContractError = useCallback((error: any): string => {
+    console.error('Contract error details:', error);
+    
+    // Check for custom errors first
+    if (error.data) {
+      try {
+        // Try to decode the error using the contract interface
+        const contract = getReferralSystemContract();
+        if (contract) {
+          const decodedError = contract.interface.parseError(error.data);
+          if (decodedError) {
+            const errorName = decodedError.name;
+            const userMessage = CONTRACT_ERROR_MESSAGES[errorName as keyof typeof CONTRACT_ERROR_MESSAGES];
+            if (userMessage) {
+              return userMessage;
+            }
+            return `Contract error: ${errorName}`;
+          }
+        }
+      } catch (decodeError) {
+        console.warn('Could not decode custom error:', decodeError);
+      }
+    }
+
+    // Check for known error patterns in the message
+    const errorMessage = error.message || error.reason || '';
+    
+    // Check for specific error patterns
+    for (const [errorType, userMessage] of Object.entries(CONTRACT_ERROR_MESSAGES)) {
+      if (errorMessage.includes(errorType)) {
+        return userMessage;
+      }
+    }
+
+    // Handle common transaction errors
+    if (errorMessage.includes('user rejected')) {
+      return 'Transaction was cancelled by user';
+    }
+    
+    if (errorMessage.includes('insufficient funds')) {
+      return 'Insufficient funds for gas fees. Please add more Sepolia ETH to your wallet.';
+    }
+    
+    if (errorMessage.includes('nonce too high') || errorMessage.includes('nonce too low')) {
+      return 'Transaction nonce error. Please try again.';
+    }
+    
+    if (errorMessage.includes('gas')) {
+      return 'Transaction failed due to gas issues. Please try again with higher gas limit.';
+    }
+
+    if (errorMessage.includes('network')) {
+      return 'Network error. Please check your connection and try again.';
+    }
+
+    // Default error message
+    return 'Transaction failed. Please try again.';
   }, []);
 
   // Check if contracts are deployed
@@ -197,9 +257,10 @@ export const useContract = () => {
       };
     } catch (error) {
       console.error('Error fetching user data:', error);
+      const errorMessage = handleContractError(error);
       const toastKey = `user-data-error-${userAddress}`;
       if (!toastShownRef.current.has(toastKey)) {
-        toast.error('Error fetching user data from contract', {
+        toast.error(`Error fetching user data: ${errorMessage}`, {
           duration: 4000,
           icon: '⚠️',
           id: toastKey,
@@ -208,7 +269,7 @@ export const useContract = () => {
       }
       return null;
     }
-  }, [getReferralSystemContract, generateReferralCode, registerReferralCode]);
+  }, [getReferralSystemContract, generateReferralCode, registerReferralCode, handleContractError]);
 
   const processReferral = useCallback(async (referralCode: string): Promise<boolean> => {
     if (!signer || !address || !isCorrectNetwork) {
@@ -255,8 +316,22 @@ export const useContract = () => {
         return false;
       }
 
-      // Check if user has already been referred
-      const hasBeenReferred = await contract.hasBeenReferred(address);
+      // Pre-flight checks
+      const [hasBeenReferred, isReferrerEligible, isPaused] = await Promise.all([
+        contract.hasBeenReferred(address),
+        contract.isEligibleForReferral(referrerAddress),
+        contract.paused()
+      ]);
+
+      if (isPaused) {
+        toast.error('Referral system is currently paused. Please try again later.', {
+          duration: 4000,
+          icon: '⏸️',
+          id: 'system-paused',
+        });
+        return false;
+      }
+
       if (hasBeenReferred) {
         toast.error('You have already been referred by someone else!', {
           duration: 4000,
@@ -266,8 +341,6 @@ export const useContract = () => {
         return false;
       }
 
-      // Check if referrer is eligible
-      const isReferrerEligible = await contract.isEligibleForReferral(referrerAddress);
       if (!isReferrerEligible) {
         toast.error('Referrer is not eligible to make referrals at this time (rate limited)', {
           duration: 4000,
@@ -280,6 +353,19 @@ export const useContract = () => {
       const processingToastId = toast.loading('Processing referral...', {
         icon: '⏳',
       });
+
+      // Estimate gas first to catch errors early
+      try {
+        await contract.processReferral.estimateGas(address, referrerAddress);
+      } catch (gasError) {
+        const errorMessage = handleContractError(gasError);
+        toast.error(`Transaction would fail: ${errorMessage}`, {
+          duration: 5000,
+          icon: '❌',
+          id: processingToastId,
+        });
+        return false;
+      }
 
       const tx = await contract.processReferral(address, referrerAddress);
       
@@ -305,24 +391,7 @@ export const useContract = () => {
       
     } catch (error: any) {
       console.error('Error processing referral:', error);
-      
-      let errorMessage = 'Failed to process referral';
-      
-      if (error.reason) {
-        errorMessage = error.reason;
-      } else if (error.message.includes('user rejected')) {
-        errorMessage = 'Transaction was rejected by user';
-      } else if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds for gas fees';
-      } else if (error.message.includes('UserAlreadyReferred')) {
-        errorMessage = 'You have already been referred!';
-      } else if (error.message.includes('SelfReferralNotAllowed')) {
-        errorMessage = 'You cannot refer yourself!';
-      } else if (error.message.includes('ReferralTooSoon')) {
-        errorMessage = 'Referrer must wait before making another referral';
-      } else if (error.message.includes('MaxReferralsExceeded')) {
-        errorMessage = 'Referrer has reached maximum referral limit';
-      }
+      const errorMessage = handleContractError(error);
       
       toast.error(errorMessage, {
         duration: 5000,
@@ -333,7 +402,7 @@ export const useContract = () => {
     } finally {
       setLoading(false);
     }
-  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData]);
+  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData, handleContractError]);
 
   const getReferralHistory = useCallback(async (userAddress: string): Promise<Referral[]> => {
     const contract = getReferralSystemContract();
@@ -597,5 +666,6 @@ export const useContract = () => {
     getPlatformStats,
     getUserData,
     validateReferralCode,
+    handleContractError,
   };
 };
