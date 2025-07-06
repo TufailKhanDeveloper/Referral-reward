@@ -96,8 +96,9 @@ export const REFERRAL_TOKEN_ABI = [
   'function paused() view returns (bool)',
 ];
 
-// Error message mapping for better user experience
-export const CONTRACT_ERROR_MESSAGES = {
+// Enhanced error message mapping for better user experience
+export const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
+  // Contract-specific errors
   'InsufficientTokenBalance': 'Contract does not have enough tokens for rewards. Please contact support.',
   'InvalidAddress': 'Invalid wallet address provided.',
   'InvalidAmount': 'Invalid amount specified.',
@@ -109,6 +110,45 @@ export const CONTRACT_ERROR_MESSAGES = {
   'AccessControlUnauthorizedAccount': 'You do not have permission to perform this action.',
   'UnauthorizedMinter': 'Unauthorized to mint tokens.',
   'ExceedsMaxSupply': 'Would exceed maximum token supply.',
+  
+  // ERC20 errors
   'ERC20InsufficientBalance': 'Insufficient token balance.',
   'ERC20InsufficientAllowance': 'Insufficient token allowance.',
+  'ERC20InvalidReceiver': 'Invalid token receiver address.',
+  'ERC20InvalidSender': 'Invalid token sender address.',
+  'ERC20InvalidApprover': 'Invalid token approver address.',
+  'ERC20InvalidSpender': 'Invalid token spender address.',
+  
+  // Ownable errors
+  'OwnableUnauthorizedAccount': 'Only the contract owner can perform this action.',
+  'OwnableInvalidOwner': 'Invalid owner address.',
+  
+  // Access control errors
+  'AccessControlBadConfirmation': 'Access control confirmation failed.',
+};
+
+// Error selector mapping for quick lookup
+export const ERROR_SELECTORS: Record<string, string> = {
+  '0xe4455cae': 'UnauthorizedBackend',
+  '0xd92e233d': 'InvalidAddress',
+  '0x2c5211c6': 'InvalidAmount',
+  '0x3ee5aeb5': 'UserAlreadyReferred',
+  '0x4ca88867': 'SelfReferralNotAllowed',
+  '0x8d6ea8be': 'ReferralTooSoon',
+  '0x7d3d5b0a': 'MaxReferralsExceeded',
+  '0x356680b7': 'InsufficientTokenBalance',
+};
+
+// Function to decode error by selector
+export const decodeErrorBySelector = (errorData: string): string | null => {
+  if (!errorData || errorData.length < 10) return null;
+  
+  const selector = errorData.slice(0, 10); // First 4 bytes (8 hex chars + 0x)
+  const errorName = ERROR_SELECTORS[selector];
+  
+  if (errorName) {
+    return CONTRACT_ERROR_MESSAGES[errorName] || `Contract error: ${errorName}`;
+  }
+  
+  return null;
 };

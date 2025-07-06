@@ -204,33 +204,33 @@ function App() {
           )}
         </main>
 
-        {/* Enhanced Personal Footer */}
-        <footer className="mt-12 sm:mt-16 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 dark:from-gray-800 dark:via-gray-900 dark:to-black">
+        {/* Enhanced Personal Footer with Matching Background */}
+        <footer className="mt-12 sm:mt-16 bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border-t border-gray-200/50 dark:border-gray-700/50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
             {/* Main Footer Content */}
             <div className="text-center space-y-6">
               {/* Made with Love Section */}
               <div className="space-y-4">
-                <div className="flex items-center justify-center space-x-2 text-white/90">
+                <div className="flex items-center justify-center space-x-2 text-gray-700 dark:text-gray-300">
                   <span className="text-lg font-medium">Made with</span>
                   <Heart className="h-5 w-5 text-red-500 animate-pulse" />
                   <span className="text-lg font-medium">by</span>
                 </div>
                 
                 <div className="space-y-2">
-                  <h3 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  <h3 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                     Huzaifa Khan
                   </h3>
-                  <p className="text-blue-200 dark:text-blue-300 font-medium text-lg">
+                  <p className="text-blue-700 dark:text-blue-300 font-medium text-lg">
                     Full-Stack Developer & Blockchain Enthusiast
                   </p>
                 </div>
                 
-                <div className="flex items-center justify-center space-x-2 text-purple-200 dark:text-purple-300">
+                <div className="flex items-center justify-center space-x-2 text-purple-700 dark:text-purple-300">
                   <span className="text-sm">Powered by coffee</span>
-                  <Coffee className="h-4 w-4 text-amber-400" />
+                  <Coffee className="h-4 w-4 text-amber-500" />
                   <span className="text-sm">and creativity</span>
-                  <Sparkles className="h-4 w-4 text-yellow-400" />
+                  <Sparkles className="h-4 w-4 text-yellow-500" />
                 </div>
               </div>
 
@@ -241,11 +241,11 @@ function App() {
                   href="https://github.com/HuzaifaKhanDeveloper/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-center space-x-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl transition-all duration-300 transform hover:scale-105 border border-white/20 hover:border-white/30"
+                  className="group flex items-center space-x-3 px-6 py-3 bg-white/70 hover:bg-white/90 dark:bg-gray-800/70 dark:hover:bg-gray-800/90 backdrop-blur-sm rounded-xl transition-all duration-300 transform hover:scale-105 border border-gray-200/50 hover:border-gray-300/70 dark:border-gray-700/50 dark:hover:border-gray-600/70 shadow-lg hover:shadow-xl"
                 >
-                  <Github className="h-5 w-5 text-white group-hover:text-blue-300 transition-colors" />
-                  <span className="text-white font-medium">Profile</span>
-                  <ExternalLink className="h-4 w-4 text-white/70 group-hover:text-white transition-colors" />
+                  <Github className="h-5 w-5 text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">Profile</span>
+                  <ExternalLink className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors" />
                 </a>
 
                 {/* Source Code Link */}
@@ -253,32 +253,26 @@ function App() {
                   href="https://github.com/HuzaifaKhanDeveloper/Referral-reward"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-center space-x-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl transition-all duration-300 transform hover:scale-105 border border-white/20 hover:border-white/30"
+                  className="group flex items-center space-x-3 px-6 py-3 bg-white/70 hover:bg-white/90 dark:bg-gray-800/70 dark:hover:bg-gray-800/90 backdrop-blur-sm rounded-xl transition-all duration-300 transform hover:scale-105 border border-gray-200/50 hover:border-gray-300/70 dark:border-gray-700/50 dark:hover:border-gray-600/70 shadow-lg hover:shadow-xl"
                 >
-                  <Github className="h-5 w-5 text-white group-hover:text-green-300 transition-colors" />
-                  <span className="text-white font-medium">Source Code</span>
-                  <ExternalLink className="h-4 w-4 text-white/70 group-hover:text-white transition-colors" />
+                  <Github className="h-5 w-5 text-gray-700 dark:text-gray-300 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors" />
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">Source Code</span>
+                  <ExternalLink className="h-4 w-4 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors" />
                 </a>
               </div>
 
               {/* Divider */}
-              <div className="w-full h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300/50 dark:via-gray-600/50 to-transparent"></div>
 
               {/* Bottom Section */}
               <div className="space-y-3">
-                <p className="text-white/80 text-sm">
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                   Built with ❤️ for the Web3 community • Powered by Ethereum Sepolia Testnet
                 </p>
-                <p className="text-white/60 text-xs">
+                <p className="text-gray-500 dark:text-gray-500 text-xs">
                   © 2024 Huzaifa Khan. Open source and available on GitHub.
                 </p>
               </div>
-            </div>
-
-            {/* Decorative Elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
-              <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
             </div>
           </div>
         </footer>

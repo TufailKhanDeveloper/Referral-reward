@@ -9,7 +9,9 @@ import {
   Users,
   Gift,
   ExternalLink,
-  Smartphone
+  Smartphone,
+  Twitter,
+  Send
 } from 'lucide-react';
 import { TwitterShareButton, TelegramShareButton } from 'react-share';
 import QRCodeLib from 'qrcode';
@@ -85,7 +87,30 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
     }
   };
 
-  const shareText = `🎉 Join me on this amazing platform and earn REFT tokens! Use my referral code: ${referralCode}`;
+  const shareText = `🎉 Join me on this amazing Web3 platform and earn REFT tokens! Use my referral code: ${referralCode}`;
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join me and earn REFT tokens!',
+          text: shareText,
+          url: referralLink,
+        });
+        toast.success('Shared successfully! 🎉', {
+          duration: 2000,
+          icon: '📤',
+        });
+      } catch (error) {
+        // User cancelled or error occurred
+        if (error instanceof Error && error.name !== 'AbortError') {
+          copyToClipboard(shareText + ' ' + referralLink, 'link');
+        }
+      }
+    } else {
+      copyToClipboard(shareText + ' ' + referralLink, 'link');
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-gray-700">
@@ -159,7 +184,7 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Professional Action Buttons */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Tooltip content="Generate QR code for easy sharing">
             <button
@@ -167,7 +192,7 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
               className="flex items-center justify-center space-x-2 px-3 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
               <QrCode size={16} />
-              <span className="text-sm">QR Code</span>
+              <span className="text-sm font-medium">QR Code</span>
             </button>
           </Tooltip>
 
@@ -175,10 +200,11 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
             <TwitterShareButton
               url={referralLink}
               title={shareText}
+              hashtags={['Web3', 'Crypto', 'Referral', 'REFT']}
               className="flex items-center justify-center space-x-2 px-3 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 w-full"
             >
-              <Share2 size={16} />
-              <span className="text-sm">Twitter</span>
+              <Twitter size={16} />
+              <span className="text-sm font-medium">Twitter</span>
             </TwitterShareButton>
           </Tooltip>
 
@@ -188,38 +214,28 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
               title={shareText}
               className="flex items-center justify-center space-x-2 px-3 py-3 bg-blue-400 hover:bg-blue-500 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 w-full"
             >
-              <Share2 size={16} />
-              <span className="text-sm">Telegram</span>
+              <Send size={16} />
+              <span className="text-sm font-medium">Telegram</span>
             </TelegramShareButton>
           </Tooltip>
 
           <Tooltip content="More sharing options">
             <button
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({
-                    title: 'Join me and earn REFT tokens!',
-                    text: shareText,
-                    url: referralLink,
-                  });
-                } else {
-                  copyToClipboard(shareText + ' ' + referralLink, 'link');
-                }
-              }}
+              onClick={handleNativeShare}
               className="flex items-center justify-center space-x-2 px-3 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              <Sparkles size={16} />
-              <span className="text-sm">More</span>
+              <Share2 size={16} />
+              <span className="text-sm font-medium">Share</span>
             </button>
           </Tooltip>
         </div>
 
-        {/* Rewards Info */}
+        {/* Professional Rewards Info */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-700 rounded-xl p-4">
           <div className="flex items-center space-x-2 mb-3">
             <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
             <h4 className="font-semibold text-green-800 dark:text-green-200">
-              Referral Rewards
+              Referral Rewards Structure
             </h4>
           </div>
           
@@ -230,7 +246,7 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
               </div>
               <div>
                 <p className="font-medium text-green-800 dark:text-green-200">
-                  You earn: 1000 REFT
+                  You earn: 1,000 REFT
                 </p>
                 <p className="text-green-600 dark:text-green-400 text-xs">
                   For each successful referral
@@ -255,7 +271,7 @@ export const EnhancedReferralGenerator: React.FC<EnhancedReferralGeneratorProps>
         </div>
       </div>
 
-      {/* QR Code Modal */}
+      {/* Enhanced QR Code Modal */}
       {showQR && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">

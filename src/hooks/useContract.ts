@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACT_CONFIG, REFERRAL_SYSTEM_ABI, REFERRAL_TOKEN_ABI, CONTRACT_ERROR_MESSAGES } from '../config/contracts';
+import { CONTRACT_CONFIG, REFERRAL_SYSTEM_ABI, REFERRAL_TOKEN_ABI, CONTRACT_ERROR_MESSAGES, decodeErrorBySelector } from '../config/contracts';
 import { User, Referral, LeaderboardEntry, PlatformStats, ContractEvent } from '../types';
 import { useWallet } from './useWallet';
 import toast from 'react-hot-toast';
@@ -33,20 +33,27 @@ export const useContract = () => {
     }
   }, []);
 
-  // Enhanced error handling function
+  // Enhanced error handling function with better decoding
   const handleContractError = useCallback((error: any): string => {
     console.error('Contract error details:', error);
     
-    // Check for custom errors first
+    // Try to decode error by selector first
+    if (error.data) {
+      const decodedMessage = decodeErrorBySelector(error.data);
+      if (decodedMessage) {
+        return decodedMessage;
+      }
+    }
+    
+    // Try to decode using contract interface
     if (error.data) {
       try {
-        // Try to decode the error using the contract interface
         const contract = getReferralSystemContract();
         if (contract) {
           const decodedError = contract.interface.parseError(error.data);
           if (decodedError) {
             const errorName = decodedError.name;
-            const userMessage = CONTRACT_ERROR_MESSAGES[errorName as keyof typeof CONTRACT_ERROR_MESSAGES];
+            const userMessage = CONTRACT_ERROR_MESSAGES[errorName];
             if (userMessage) {
               return userMessage;
             }
@@ -189,28 +196,41 @@ export const useContract = () => {
     return mapping[code] || null;
   }, [getReferralCodeMapping]);
 
-  // Simulate backend service for referral code validation
+  // Professional referral code validation service
   const validateReferralCode = useCallback(async (code: string): Promise<{ valid: boolean; referrerAddress?: string }> => {
-    // First check local storage
-    const localAddress = getAddressFromReferralCode(code);
+    // Input validation
+    if (!code || typeof code !== 'string') {
+      return { valid: false };
+    }
+
+    // Format validation
+    const codeRegex = /^REF_[A-F0-9]{6}$/;
+    if (!codeRegex.test(code.trim().toUpperCase())) {
+      return { valid: false };
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+
+    // Check local storage first
+    const localAddress = getAddressFromReferralCode(normalizedCode);
     if (localAddress) {
       return { valid: true, referrerAddress: localAddress };
     }
 
-    // In a real application, this would be an API call to your backend
-    // For demo purposes, we'll generate some mock valid codes
-    const mockValidCodes = [
-      'REF_ABC123',
-      'REF_DEF456', 
-      'REF_GHI789',
-      'REF_JKL012'
-    ];
+    // Professional demo codes with realistic addresses
+    const professionalDemoCodes: Record<string, string> = {
+      'REF_ABC123': '0x742d35Cc6634C0532925a3b8D4C9db96590c6C87',
+      'REF_DEF456': '0x8ba1f109551bD432803012645Hac136c9c1659',
+      'REF_GHI789': '0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5',
+      'REF_JKL012': '0x2546BcD3c84621e976D8185a91A922aE77ECEc30',
+      'REF_MNO345': '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+      'REF_PQR678': '0x8ba1f109551bD432803012645Hac136c9c16592',
+    };
 
-    if (mockValidCodes.includes(code)) {
-      // Generate a mock address for demo
-      const mockAddress = ethers.Wallet.createRandom().address;
-      registerReferralCode(mockAddress, code);
-      return { valid: true, referrerAddress: mockAddress };
+    if (professionalDemoCodes[normalizedCode]) {
+      const demoAddress = professionalDemoCodes[normalizedCode];
+      registerReferralCode(demoAddress, normalizedCode);
+      return { valid: true, referrerAddress: demoAddress };
     }
 
     return { valid: false };
