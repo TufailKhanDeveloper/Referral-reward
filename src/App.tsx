@@ -10,7 +10,7 @@ import { RealTimeEvents } from './components/RealTimeEvents';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useWallet } from './hooks/useWallet';
 import { useContract } from './hooks/useContract';
-import { Users, Trophy, Gift, BarChart3, Activity, Sparkles } from 'lucide-react';
+import { Users, Trophy, Gift, BarChart3, Activity, Sparkles, Heart, Coffee, Github, ExternalLink } from 'lucide-react';
 
 type Tab = 'dashboard' | 'referral' | 'leaderboard' | 'events';
 
@@ -204,13 +204,81 @@ function App() {
           )}
         </main>
 
-        {/* Enhanced Footer */}
-        <footer className="mt-12 sm:mt-16 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-700/50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <div className="text-center">
-              <p className="text-gray-600 dark:text-gray-400 text-sm">
-                Built with ❤️ for the Web3 community • Powered by Ethereum Sepolia Testnet
-              </p>
+        {/* Enhanced Personal Footer */}
+        <footer className="mt-12 sm:mt-16 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 dark:from-gray-800 dark:via-gray-900 dark:to-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+            {/* Main Footer Content */}
+            <div className="text-center space-y-6">
+              {/* Made with Love Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-center space-x-2 text-white/90">
+                  <span className="text-lg font-medium">Made with</span>
+                  <Heart className="h-5 w-5 text-red-500 animate-pulse" />
+                  <span className="text-lg font-medium">by</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    Huzaifa Khan
+                  </h3>
+                  <p className="text-blue-200 dark:text-blue-300 font-medium text-lg">
+                    Full-Stack Developer & Blockchain Enthusiast
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-center space-x-2 text-purple-200 dark:text-purple-300">
+                  <span className="text-sm">Powered by coffee</span>
+                  <Coffee className="h-4 w-4 text-amber-400" />
+                  <span className="text-sm">and creativity</span>
+                  <Sparkles className="h-4 w-4 text-yellow-400" />
+                </div>
+              </div>
+
+              {/* Links Section */}
+              <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-8">
+                {/* Profile Link */}
+                <a
+                  href="https://github.com/HuzaifaKhanDeveloper/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center space-x-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl transition-all duration-300 transform hover:scale-105 border border-white/20 hover:border-white/30"
+                >
+                  <Github className="h-5 w-5 text-white group-hover:text-blue-300 transition-colors" />
+                  <span className="text-white font-medium">Profile</span>
+                  <ExternalLink className="h-4 w-4 text-white/70 group-hover:text-white transition-colors" />
+                </a>
+
+                {/* Source Code Link */}
+                <a
+                  href="https://github.com/HuzaifaKhanDeveloper/Referral-reward"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center space-x-3 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl transition-all duration-300 transform hover:scale-105 border border-white/20 hover:border-white/30"
+                >
+                  <Github className="h-5 w-5 text-white group-hover:text-green-300 transition-colors" />
+                  <span className="text-white font-medium">Source Code</span>
+                  <ExternalLink className="h-4 w-4 text-white/70 group-hover:text-white transition-colors" />
+                </a>
+              </div>
+
+              {/* Divider */}
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+
+              {/* Bottom Section */}
+              <div className="space-y-3">
+                <p className="text-white/80 text-sm">
+                  Built with ❤️ for the Web3 community • Powered by Ethereum Sepolia Testnet
+                </p>
+                <p className="text-white/60 text-xs">
+                  © 2024 Huzaifa Khan. Open source and available on GitHub.
+                </p>
+              </div>
+            </div>
+
+            {/* Decorative Elements */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
             </div>
           </div>
         </footer>
