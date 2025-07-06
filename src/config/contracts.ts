@@ -42,6 +42,8 @@ export const REFERRAL_SYSTEM_ABI = [
   'error SelfReferralNotAllowed()',
   'error UnauthorizedBackend()',
   'error UserAlreadyReferred()',
+  'error InvalidReferralCode()',
+  'error ReferralCodeAlreadyExists()',
 
   // Read functions
   'function getReferrals(address user) view returns (tuple(address referee, address referrer, uint256 timestamp, uint256 referrerReward, uint256 refereeReward)[])',
@@ -59,13 +61,23 @@ export const REFERRAL_SYSTEM_ABI = [
   'function paused() view returns (bool)',
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function BACKEND_ROLE() view returns (bytes32)',
+  'function frontendMode() view returns (bool)',
+  'function getReferrerFromCode(string referralCode) view returns (address)',
+  'function getReferralCode(address user) view returns (string)',
+  'function referralCodeToAddress(string) view returns (address)',
+  'function addressToReferralCode(address) view returns (string)',
   
   // Write functions
   'function processReferral(address referee, address referrer)',
+  'function processReferralByCode(string referralCode)',
+  'function registerReferralCode(string referralCode)',
+  'function setFrontendMode(bool enabled)',
   
   // Events
   'event ReferralProcessed(address indexed referee, address indexed referrer, uint256 timestamp)',
   'event RewardsDistributed(address indexed user, uint256 amount, uint8 referralType)',
+  'event ReferralCodeRegistered(address indexed user, string referralCode)',
+  'event FrontendModeUpdated(bool enabled)',
 ];
 
 export const REFERRAL_TOKEN_ABI = [
@@ -110,6 +122,8 @@ export const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   'AccessControlUnauthorizedAccount': 'You do not have permission to perform this action.',
   'UnauthorizedMinter': 'Unauthorized to mint tokens.',
   'ExceedsMaxSupply': 'Would exceed maximum token supply.',
+  'InvalidReferralCode': 'Invalid or non-existent referral code.',
+  'ReferralCodeAlreadyExists': 'This referral code is already registered.',
   
   // ERC20 errors
   'ERC20InsufficientBalance': 'Insufficient token balance.',
@@ -137,6 +151,8 @@ export const ERROR_SELECTORS: Record<string, string> = {
   '0x8d6ea8be': 'ReferralTooSoon',
   '0x7d3d5b0a': 'MaxReferralsExceeded',
   '0x356680b7': 'InsufficientTokenBalance',
+  '0x8baa579f': 'InvalidReferralCode',
+  '0x9b96eece': 'ReferralCodeAlreadyExists',
 };
 
 // Function to decode error by selector

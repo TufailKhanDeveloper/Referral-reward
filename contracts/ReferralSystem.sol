@@ -9,7 +9,7 @@ import "./ReferralToken.sol";
 
 /**
  * @title ReferralSystem
- * @dev Complete referral rewards system with security features
+ * @dev Enhanced referral rewards system with frontend compatibility
  * @author Referral Rewards System
  */
 contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
@@ -29,6 +29,9 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     
     // Maximum referrals per user
     uint256 public maxReferralsPerUser;
+    
+    // Frontend mode - allows direct user interactions for testing
+    bool public frontendMode;
     
     // Enum for referral types
     enum ReferralType {
@@ -52,6 +55,10 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     mapping(address => uint256) public totalRewardsEarned;
     mapping(address => bool) public hasBeenReferred;
     
+    // Referral code to address mapping for frontend mode
+    mapping(string => address) public referralCodeToAddress;
+    mapping(address => string) public addressToReferralCode;
+    
     // Events
     event ReferralProcessed(
         address indexed referee,
@@ -72,6 +79,8 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     
     event MinReferralIntervalUpdated(uint256 newInterval);
     event MaxReferralsPerUserUpdated(uint256 newMaxReferrals);
+    event FrontendModeUpdated(bool enabled);
+    event ReferralCodeRegistered(address indexed user, string referralCode);
     
     // Errors
     error InvalidAddress();
@@ -82,6 +91,8 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     error MaxReferralsExceeded();
     error InsufficientTokenBalance();
     error UnauthorizedBackend();
+    error InvalidReferralCode();
+    error ReferralCodeAlreadyExists();
     
     /**
      * @dev Constructor
@@ -97,7 +108,7 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         uint256 _refereeReward,
         address _backendWallet,
         uint256 _minReferralInterval
-    ) {
+    ) Ownable(msg.sender) {
         if (_tokenAddress == address(0)) revert InvalidAddress();
         if (_backendWallet == address(0)) revert InvalidAddress();
         if (_referrerReward == 0 || _refereeReward == 0) revert InvalidAmount();
@@ -107,14 +118,50 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         refereeReward = _refereeReward;
         minReferralInterval = _minReferralInterval;
         maxReferralsPerUser = 100; // Default maximum referrals
+        frontendMode = true; // Enable frontend mode by default for testing
         
         // Setup roles
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(BACKEND_ROLE, _backendWallet);
+        _grantRole(BACKEND_ROLE, msg.sender); // Owner also gets backend role
     }
     
     /**
-     * @dev Process a referral and distribute rewards
+     * @dev Register a referral code for a user (frontend mode)
+     * @param _referralCode The referral code to register
+     */
+    function registerReferralCode(string memory _referralCode) external {
+        if (!frontendMode) revert UnauthorizedBackend();
+        if (bytes(_referralCode).length == 0) revert InvalidReferralCode();
+        if (referralCodeToAddress[_referralCode] != address(0)) revert ReferralCodeAlreadyExists();
+        
+        // If user already has a code, remove the old mapping
+        string memory oldCode = addressToReferralCode[msg.sender];
+        if (bytes(oldCode).length > 0) {
+            delete referralCodeToAddress[oldCode];
+        }
+        
+        referralCodeToAddress[_referralCode] = msg.sender;
+        addressToReferralCode[msg.sender] = _referralCode;
+        
+        emit ReferralCodeRegistered(msg.sender, _referralCode);
+    }
+    
+    /**
+     * @dev Process a referral using referral code (frontend mode)
+     * @param _referralCode The referral code to use
+     */
+    function processReferralByCode(string memory _referralCode) external nonReentrant whenNotPaused {
+        if (!frontendMode) revert UnauthorizedBackend();
+        
+        address referrer = referralCodeToAddress[_referralCode];
+        if (referrer == address(0)) revert InvalidReferralCode();
+        
+        _processReferralInternal(msg.sender, referrer);
+    }
+    
+    /**
+     * @dev Process a referral with addresses (backend mode)
      * @param _referee Address of the referee (new user)
      * @param _referrer Address of the referrer (existing user)
      */
@@ -122,9 +169,20 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         address _referee,
         address _referrer
     ) external nonReentrant whenNotPaused {
-        // Check if caller has backend role
-        if (!hasRole(BACKEND_ROLE, msg.sender)) revert UnauthorizedBackend();
+        // Check authorization
+        if (!frontendMode && !hasRole(BACKEND_ROLE, msg.sender)) {
+            revert UnauthorizedBackend();
+        }
         
+        _processReferralInternal(_referee, _referrer);
+    }
+    
+    /**
+     * @dev Internal function to process referrals
+     * @param _referee Address of the referee
+     * @param _referrer Address of the referrer
+     */
+    function _processReferralInternal(address _referee, address _referrer) internal {
         // Validate addresses
         if (_referee == address(0) || _referrer == address(0)) revert InvalidAddress();
         if (_referee == _referrer) revert SelfReferralNotAllowed();
@@ -197,6 +255,24 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @dev Get referrer address from referral code
+     * @param _referralCode The referral code
+     * @return The address of the referrer
+     */
+    function getReferrerFromCode(string memory _referralCode) external view returns (address) {
+        return referralCodeToAddress[_referralCode];
+    }
+    
+    /**
+     * @dev Get referral code from address
+     * @param _user The user address
+     * @return The referral code
+     */
+    function getReferralCode(address _user) external view returns (string memory) {
+        return addressToReferralCode[_user];
+    }
+    
+    /**
      * @dev Get all referrals for a user
      * @param _user Address of the user
      * @return Array of referrals
@@ -254,6 +330,15 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
             lastReferralTime[_user],
             hasBeenReferred[_user]
         );
+    }
+    
+    /**
+     * @dev Toggle frontend mode (only owner)
+     * @param _enabled Whether to enable frontend mode
+     */
+    function setFrontendMode(bool _enabled) external onlyOwner {
+        frontendMode = _enabled;
+        emit FrontendModeUpdated(_enabled);
     }
     
     /**

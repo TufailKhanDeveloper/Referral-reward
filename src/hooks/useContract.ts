@@ -11,27 +11,10 @@ export const useContract = () => {
   const [user, setUser] = useState<User | null>(null);
   const [events, setEvents] = useState<ContractEvent[]>([]);
   const [contractsDeployed, setContractsDeployed] = useState(false);
+  const [frontendMode, setFrontendMode] = useState(false);
   const eventListenersRef = useRef<{ [key: string]: any }>({});
   const contractCheckRef = useRef<boolean>(false);
   const toastShownRef = useRef<Set<string>>(new Set());
-
-  // Persistent referral code mapping using localStorage
-  const getReferralCodeMapping = useCallback(() => {
-    try {
-      const stored = localStorage.getItem('referralCodeMapping');
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  }, []);
-
-  const setReferralCodeMapping = useCallback((mapping: { [code: string]: string }) => {
-    try {
-      localStorage.setItem('referralCodeMapping', JSON.stringify(mapping));
-    } catch (error) {
-      console.error('Failed to save referral code mapping:', error);
-    }
-  }, []);
 
   // Enhanced error handling function with better decoding
   const handleContractError = useCallback((error: any): string => {
@@ -100,7 +83,7 @@ export const useContract = () => {
     return 'Transaction failed. Please try again.';
   }, []);
 
-  // Check if contracts are deployed
+  // Check if contracts are deployed and get frontend mode
   useEffect(() => {
     const checkContracts = async () => {
       if (!provider || !isCorrectNetwork || contractCheckRef.current) return;
@@ -114,26 +97,47 @@ export const useContract = () => {
         const deployed = systemCode !== '0x' && tokenCode !== '0x';
         setContractsDeployed(deployed);
         
-        const toastKey = `contracts-${deployed ? 'connected' : 'not-found'}`;
-        
-        if (deployed && !toastShownRef.current.has(toastKey)) {
-          console.log('✅ Contracts successfully detected at:');
-          console.log('ReferralSystem:', CONTRACT_CONFIG.referralSystemAddress);
-          console.log('ReferralToken:', CONTRACT_CONFIG.referralTokenAddress);
-          toast.success('Smart contracts connected successfully!', {
-            duration: 3000,
-            icon: '🎉',
-            id: toastKey,
-          });
-          toastShownRef.current.add(toastKey);
-        } else if (!deployed && !toastShownRef.current.has(toastKey)) {
-          console.warn('❌ Contracts not found at specified addresses');
-          toast.error('Smart contracts not found at specified addresses', {
-            duration: 5000,
-            icon: '⚠️',
-            id: toastKey,
-          });
-          toastShownRef.current.add(toastKey);
+        if (deployed) {
+          // Check if frontend mode is enabled
+          const contract = new ethers.Contract(
+            CONTRACT_CONFIG.referralSystemAddress,
+            REFERRAL_SYSTEM_ABI,
+            provider
+          );
+          
+          try {
+            const isFrontendMode = await contract.frontendMode();
+            setFrontendMode(isFrontendMode);
+            
+            console.log('✅ Contracts successfully detected at:');
+            console.log('ReferralSystem:', CONTRACT_CONFIG.referralSystemAddress);
+            console.log('ReferralToken:', CONTRACT_CONFIG.referralTokenAddress);
+            console.log('Frontend Mode:', isFrontendMode ? 'Enabled' : 'Disabled');
+            
+            const toastKey = 'contracts-connected';
+            if (!toastShownRef.current.has(toastKey)) {
+              toast.success(`Smart contracts connected! Frontend mode: ${isFrontendMode ? 'Enabled' : 'Disabled'}`, {
+                duration: 3000,
+                icon: '🎉',
+                id: toastKey,
+              });
+              toastShownRef.current.add(toastKey);
+            }
+          } catch (error) {
+            console.warn('Could not check frontend mode:', error);
+            setFrontendMode(false);
+          }
+        } else {
+          const toastKey = 'contracts-not-found';
+          if (!toastShownRef.current.has(toastKey)) {
+            console.warn('❌ Contracts not found at specified addresses');
+            toast.error('Smart contracts not found at specified addresses', {
+              duration: 5000,
+              icon: '⚠️',
+              id: toastKey,
+            });
+            toastShownRef.current.add(toastKey);
+          }
         }
       } catch (error) {
         console.error('Error checking contract deployment:', error);
@@ -183,18 +187,39 @@ export const useContract = () => {
     return `REF_${hash.slice(2, 8).toUpperCase()}`;
   }, []);
 
-  // Register referral code mapping with persistence
-  const registerReferralCode = useCallback((address: string, code: string) => {
-    const mapping = getReferralCodeMapping();
-    mapping[code] = address;
-    setReferralCodeMapping(mapping);
-  }, [getReferralCodeMapping, setReferralCodeMapping]);
-
-  // Get address from referral code with persistence
-  const getAddressFromReferralCode = useCallback((code: string): string | null => {
-    const mapping = getReferralCodeMapping();
-    return mapping[code] || null;
-  }, [getReferralCodeMapping]);
+  // Register referral code on the contract
+  const registerReferralCode = useCallback(async (referralCode: string): Promise<boolean> => {
+    if (!signer || !address || !contractsDeployed || !frontendMode) return false;
+    
+    const contract = getReferralSystemContract();
+    if (!contract) return false;
+    
+    try {
+      // Check if user already has this code registered
+      const existingCode = await contract.getReferralCode(address);
+      if (existingCode === referralCode) {
+        return true; // Already registered
+      }
+      
+      const tx = await contract.registerReferralCode(referralCode);
+      await tx.wait();
+      
+      toast.success('Referral code registered successfully!', {
+        duration: 3000,
+        icon: '✅',
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error registering referral code:', error);
+      const errorMessage = handleContractError(error);
+      toast.error(`Failed to register referral code: ${errorMessage}`, {
+        duration: 4000,
+        icon: '❌',
+      });
+      return false;
+    }
+  }, [signer, address, contractsDeployed, frontendMode, getReferralSystemContract, handleContractError]);
 
   // Professional referral code validation service
   const validateReferralCode = useCallback(async (code: string): Promise<{ valid: boolean; referrerAddress?: string }> => {
@@ -211,13 +236,22 @@ export const useContract = () => {
 
     const normalizedCode = code.trim().toUpperCase();
 
-    // Check local storage first
-    const localAddress = getAddressFromReferralCode(normalizedCode);
-    if (localAddress) {
-      return { valid: true, referrerAddress: localAddress };
+    // If contracts are deployed and frontend mode is enabled, check the contract
+    if (contractsDeployed && frontendMode) {
+      const contract = getReferralSystemContract();
+      if (contract) {
+        try {
+          const referrerAddress = await contract.getReferrerFromCode(normalizedCode);
+          if (referrerAddress && referrerAddress !== ethers.ZeroAddress) {
+            return { valid: true, referrerAddress };
+          }
+        } catch (error) {
+          console.error('Error validating referral code on contract:', error);
+        }
+      }
     }
 
-    // Professional demo codes with realistic addresses
+    // Professional demo codes with realistic addresses (fallback for testing)
     const professionalDemoCodes: Record<string, string> = {
       'REF_ABC123': '0x742d35Cc6634C0532925a3b8D4C9db96590c6C87',
       'REF_DEF456': '0x8ba1f109551bD432803012645Hac136c9c1659',
@@ -229,19 +263,20 @@ export const useContract = () => {
 
     if (professionalDemoCodes[normalizedCode]) {
       const demoAddress = professionalDemoCodes[normalizedCode];
-      registerReferralCode(demoAddress, normalizedCode);
       return { valid: true, referrerAddress: demoAddress };
     }
 
     return { valid: false };
-  }, [getAddressFromReferralCode, registerReferralCode]);
+  }, [contractsDeployed, frontendMode, getReferralSystemContract]);
 
   const getUserData = useCallback(async (userAddress: string): Promise<User | null> => {
     const contract = getReferralSystemContract();
     const referralCode = generateReferralCode(userAddress);
     
-    // Register the mapping
-    registerReferralCode(userAddress, referralCode);
+    // Auto-register referral code if frontend mode is enabled
+    if (contract && frontendMode && signer && userAddress === address) {
+      registerReferralCode(referralCode);
+    }
     
     if (!contract) {
       return {
@@ -289,7 +324,7 @@ export const useContract = () => {
       }
       return null;
     }
-  }, [getReferralSystemContract, generateReferralCode, registerReferralCode, handleContractError]);
+  }, [getReferralSystemContract, generateReferralCode, frontendMode, signer, address, registerReferralCode, handleContractError]);
 
   const processReferral = useCallback(async (referralCode: string): Promise<boolean> => {
     if (!signer || !address || !isCorrectNetwork) {
@@ -337,9 +372,8 @@ export const useContract = () => {
       }
 
       // Pre-flight checks
-      const [hasBeenReferred, isReferrerEligible, isPaused] = await Promise.all([
+      const [hasBeenReferred, isPaused] = await Promise.all([
         contract.hasBeenReferred(address),
-        contract.isEligibleForReferral(referrerAddress),
         contract.paused()
       ]);
 
@@ -361,33 +395,20 @@ export const useContract = () => {
         return false;
       }
 
-      if (!isReferrerEligible) {
-        toast.error('Referrer is not eligible to make referrals at this time (rate limited)', {
-          duration: 4000,
-          icon: '⏰',
-          id: 'referrer-not-eligible',
-        });
-        return false;
-      }
-
       const processingToastId = toast.loading('Processing referral...', {
         icon: '⏳',
       });
 
-      // Estimate gas first to catch errors early
-      try {
-        await contract.processReferral.estimateGas(address, referrerAddress);
-      } catch (gasError) {
-        const errorMessage = handleContractError(gasError);
-        toast.error(`Transaction would fail: ${errorMessage}`, {
-          duration: 5000,
-          icon: '❌',
-          id: processingToastId,
-        });
-        return false;
+      let tx;
+      
+      // Use the appropriate function based on frontend mode
+      if (frontendMode) {
+        // Use referral code directly
+        tx = await contract.processReferralByCode(referralCode);
+      } else {
+        // Use addresses (requires backend role)
+        tx = await contract.processReferral(address, referrerAddress);
       }
-
-      const tx = await contract.processReferral(address, referrerAddress);
       
       toast.loading('Waiting for transaction confirmation...', {
         id: processingToastId,
@@ -422,7 +443,7 @@ export const useContract = () => {
     } finally {
       setLoading(false);
     }
-  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData, handleContractError]);
+  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData, handleContractError, frontendMode]);
 
   const getReferralHistory = useCallback(async (userAddress: string): Promise<Referral[]> => {
     const contract = getReferralSystemContract();
@@ -665,19 +686,12 @@ export const useContract = () => {
     }
   }, [isConnected, address, isCorrectNetwork, getUserData]);
 
-  // Auto-register existing users' referral codes
-  useEffect(() => {
-    if (address && contractsDeployed) {
-      const code = generateReferralCode(address);
-      registerReferralCode(address, code);
-    }
-  }, [address, contractsDeployed, generateReferralCode, registerReferralCode]);
-
   return {
     loading,
     user,
     events,
     contractsDeployed,
+    frontendMode,
     generateReferralCode,
     processReferral,
     getReferralHistory,
@@ -687,5 +701,6 @@ export const useContract = () => {
     getUserData,
     validateReferralCode,
     handleContractError,
+    registerReferralCode,
   };
 };
