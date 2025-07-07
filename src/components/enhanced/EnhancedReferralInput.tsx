@@ -369,7 +369,7 @@ export const EnhancedReferralInput: React.FC = () => {
                 <strong>Live System:</strong> Referral codes are validated through the smart contract system. 
                 When someone uses your code, both parties receive REFT tokens instantly via blockchain transaction.
                 {demoMode && ' Demo codes provide a safe way to test the system with real smart contract interactions.'}
-              {demoMode && ' The demo code provides a safe way to test the system with real smart contract interactions.'}
+              </p>
             </div>
           </div>
         )}
