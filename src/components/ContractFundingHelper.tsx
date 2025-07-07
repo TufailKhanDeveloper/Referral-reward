@@ -30,40 +30,71 @@ export const ContractFundingHelper: React.FC = () => {
 
   // Check balances and funding status
   const checkFundingStatus = async () => {
-    if (!contractsDeployed || !address) return;
+    if (!contractsDeployed || !address) {
+      console.log('Cannot check funding status:', { contractsDeployed, address });
+      return;
+    }
 
     setChecking(true);
+    console.log('🔍 Checking funding status for address:', address);
+    
     try {
       const tokenContract = getReferralTokenContract();
       const systemContract = getReferralSystemContract();
       
-      if (!tokenContract || !systemContract) return;
+      if (!tokenContract || !systemContract) {
+        console.error('Contracts not available:', { tokenContract: !!tokenContract, systemContract: !!systemContract });
+        return;
+      }
 
+      console.log('📊 Fetching balances...');
+      
       const [userBalance, contractBalance, rewardConfig] = await Promise.all([
         tokenContract.balanceOf(address),
         systemContract.getContractBalance(),
         systemContract.getRewardConfig()
       ]);
 
+      console.log('💰 Raw balances:', {
+        userBalance: userBalance.toString(),
+        contractBalance: contractBalance.toString(),
+        rewardConfig
+      });
+
       const [referrerReward, refereeReward] = rewardConfig;
       const totalRewardNeeded = referrerReward + refereeReward;
 
-      setBalances({
+      const formattedBalances = {
         userBalance: ethers.formatEther(userBalance),
         contractBalance: ethers.formatEther(contractBalance),
         requiredAmount: ethers.formatEther(totalRewardNeeded)
+      };
+
+      console.log('📈 Formatted balances:', formattedBalances);
+
+      setBalances({
+        userBalance: formattedBalances.userBalance,
+        contractBalance: formattedBalances.contractBalance,
+        requiredAmount: formattedBalances.requiredAmount
       });
 
       // Determine funding status
       if (contractBalance >= totalRewardNeeded * BigInt(10)) {
+        console.log('✅ Contract has sufficient funding');
         setFundingStatus('sufficient');
       } else if (userBalance >= totalRewardNeeded * BigInt(50)) {
+        console.log('💡 User has enough tokens to fund contract');
         setFundingStatus('needed');
       } else {
+        console.log('❌ User does not have enough tokens');
         setFundingStatus('error');
       }
     } catch (error) {
       console.error('Error checking funding status:', error);
+      toast.error('Failed to check funding status. Please try again.', {
+        duration: 3000,
+        icon: '⚠️',
+      });
       setFundingStatus('error');
     } finally {
       setChecking(false);
@@ -151,8 +182,22 @@ export const ContractFundingHelper: React.FC = () => {
 
   // Check status on component mount and when contracts change
   useEffect(() => {
-    checkFundingStatus();
+    if (contractsDeployed && address) {
+      console.log('🚀 Component mounted, checking funding status...');
+      checkFundingStatus();
+    }
   }, [contractsDeployed, address]);
+
+  // Add a manual refresh button effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (contractsDeployed && address && !checking && !loading) {
+        checkFundingStatus();
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [contractsDeployed, address, checking, loading]);
 
   const openEtherscan = (address: string) => {
     window.open(`${CONTRACT_CONFIG.blockExplorer}/address/${address}`, '_blank');
@@ -211,9 +256,10 @@ export const ContractFundingHelper: React.FC = () => {
             <div className="flex items-center space-x-2 mb-2">
               <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Your Balance</span>
+              {checking && <Loader2 className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" />}
             </div>
             <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-              {parseFloat(balances.userBalance).toLocaleString()} REFT
+              {checking ? '...' : parseFloat(balances.userBalance).toLocaleString()} REFT
             </p>
             <button
               onClick={() => openEtherscan(address!)}
@@ -228,9 +274,10 @@ export const ContractFundingHelper: React.FC = () => {
             <div className="flex items-center space-x-2 mb-2">
               <Target className="h-4 w-4 text-green-600 dark:text-green-400" />
               <span className="text-sm font-medium text-green-800 dark:text-green-200">Contract Balance</span>
+              {checking && <Loader2 className="h-3 w-3 animate-spin text-green-600 dark:text-green-400" />}
             </div>
             <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-              {parseFloat(balances.contractBalance).toLocaleString()} REFT
+              {checking ? '...' : parseFloat(balances.contractBalance).toLocaleString()} REFT
             </p>
             <button
               onClick={() => openEtherscan(CONTRACT_CONFIG.referralSystemAddress)}
@@ -247,7 +294,7 @@ export const ContractFundingHelper: React.FC = () => {
               <span className="text-sm font-medium text-purple-800 dark:text-purple-200">Per Referral</span>
             </div>
             <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-              {parseFloat(balances.requiredAmount).toLocaleString()} REFT
+              {checking ? '...' : parseFloat(balances.requiredAmount).toLocaleString()} REFT
             </p>
             <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
               1000 + 500 REFT
@@ -281,7 +328,7 @@ export const ContractFundingHelper: React.FC = () => {
                   Contract Needs Funding
                 </h3>
                 <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-4">
-                  The contract needs more REFT tokens to process referrals. You have enough tokens to fund it.
+                  The contract needs more REFT tokens to process referrals. You have {parseFloat(balances.userBalance).toLocaleString()} REFT tokens available to fund it.
                 </p>
                 <button
                   onClick={autoFundContract}
@@ -312,10 +359,13 @@ export const ContractFundingHelper: React.FC = () => {
               <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
               <div>
                 <h3 className="font-semibold text-red-800 dark:text-red-200">
-                  Insufficient Tokens
+                  {parseFloat(balances.userBalance) === 0 ? 'No REFT Tokens Found' : 'Insufficient Tokens'}
                 </h3>
                 <p className="text-red-700 dark:text-red-300 text-sm">
-                  You don't have enough REFT tokens to fund the contract. Please acquire more tokens first.
+                  {parseFloat(balances.userBalance) === 0 
+                    ? 'No REFT tokens detected in your wallet. Please check if you\'re connected to the correct wallet or acquire REFT tokens first.'
+                    : `You have ${parseFloat(balances.userBalance).toLocaleString()} REFT tokens, but need at least ${parseFloat(balances.requiredAmount) * 50} REFT to fund the contract properly.`
+                  }
                 </p>
               </div>
             </div>

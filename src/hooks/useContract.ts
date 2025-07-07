@@ -178,20 +178,38 @@ export const useContract = () => {
       REFERRAL_SYSTEM_ABI,
       signer || provider
     );
+    
+    console.log('🏗️ System contract created:', {
+      address: CONTRACT_CONFIG.referralSystemAddress,
+      hasSigner: !!signer,
+      hasProvider: !!provider
+    });
+    
+    return contract;
   }, [provider, signer, isCorrectNetwork, contractsDeployed]);
 
   const getReferralTokenContract = useCallback(() => {
     if (!provider || !isCorrectNetwork || !contractsDeployed) return null;
-    return new ethers.Contract(
+    
+    const contract = new ethers.Contract(
       CONTRACT_CONFIG.referralTokenAddress,
       REFERRAL_TOKEN_ABI,
       signer || provider
     );
+    
+    console.log('🪙 Token contract created:', {
+      address: CONTRACT_CONFIG.referralTokenAddress,
+      hasSigner: !!signer,
+      hasProvider: !!provider
+    });
+    
+    return contract;
   }, [provider, signer, isCorrectNetwork, contractsDeployed]);
 
   const generateReferralCode = useCallback((address: string): string => {
     // Generate a deterministic referral code based on address
-    const hash = ethers.keccak256(ethers.toUtf8Bytes(address));
+    
+    const contract = new ethers.Contract(
     return `REF_${hash.slice(2, 8).toUpperCase()}`;
   }, []);
 
