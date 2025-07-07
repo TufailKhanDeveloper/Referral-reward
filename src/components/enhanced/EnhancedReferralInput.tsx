@@ -69,36 +69,6 @@ export const EnhancedReferralInput: React.FC = () => {
       status: 'Active',
       rewards: '500 REFT'
     },
-    { 
-      code: 'REF_DEF456', 
-      description: 'Demo Beta',
-      status: 'Active',
-      rewards: '500 REFT'
-    },
-    { 
-      code: 'REF_GHI789', 
-      description: 'Demo Gamma',
-      status: 'Active',
-      rewards: '500 REFT'
-    },
-    { 
-      code: 'REF_JKL012', 
-      description: 'Demo Delta',
-      status: 'Active',
-      rewards: '500 REFT'
-    },
-    { 
-      code: 'REF_MNO345', 
-      description: 'Demo Epsilon',
-      status: 'Active',
-      rewards: '500 REFT'
-    },
-    { 
-      code: 'REF_PQR678', 
-      description: 'Demo Zeta',
-      status: 'Active',
-      rewards: '500 REFT'
-    },
   ];
 
   const handleDemoCodeClick = async (code: string) => {
@@ -228,24 +198,24 @@ export const EnhancedReferralInput: React.FC = () => {
               <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
                 Try these professional demo codes to test the referral system with real smart contract integration:
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+              <div className="grid grid-cols-1 gap-3 text-sm">
                 {professionalDemoCodes.map((demo) => (
                   <button
                     key={demo.code}
                     onClick={() => handleDemoCodeClick(demo.code)}
-                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-3 py-3 rounded-lg border border-blue-200 dark:border-blue-600 text-left transition-all duration-200 hover:shadow-md"
+                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-4 py-4 rounded-lg border border-blue-200 dark:border-blue-600 text-left transition-all duration-200 hover:shadow-md"
                   >
-                    <div className="font-bold text-blue-800 dark:text-blue-200 font-mono text-xs">
+                    <div className="font-bold text-blue-800 dark:text-blue-200 font-mono text-sm">
                       {demo.code}
                     </div>
-                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">
                       {demo.description}
                     </div>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                         {demo.status}
                       </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
                         Earn {demo.rewards}
                       </span>
                     </div>
@@ -256,8 +226,8 @@ export const EnhancedReferralInput: React.FC = () => {
                 <div className="flex items-start space-x-2">
                   <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                    <strong>Live Demo Mode:</strong> These codes are built into the smart contract and work with real blockchain transactions. 
-                    Demo referrers receive virtual rewards while you get real REFT tokens!
+                    <strong>Demo Code Available:</strong> This code is built into the smart contract for testing. 
+                    You'll receive real REFT tokens, while the demo referrer gets virtual rewards.
                   </p>
                 </div>
               </div>
@@ -354,7 +324,7 @@ export const EnhancedReferralInput: React.FC = () => {
               2
             </div>
             <p>
-              <strong>Both you and the referrer earn REFT tokens</strong> instantly upon successful referral
+              <strong>Both you and the referrer earn REFT tokens</strong> instantly upon successful referral (you: 500 REFT, referrer: 1000 REFT)
             </p>
           </div>
           
@@ -365,6 +335,17 @@ export const EnhancedReferralInput: React.FC = () => {
             <p>
               <strong>Start referring others</strong> using your own code to earn even more rewards
             </p>
+          </div>
+          
+          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
+            <div className="flex items-start space-x-2">
+              <Info className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">
+                <strong>Real Referral Codes:</strong> If you have a friend's referral code (like REF_AE9041), 
+                make sure they have generated and shared their code from this platform. 
+                The code format should be REF_ followed by 6 characters.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -388,7 +369,7 @@ export const EnhancedReferralInput: React.FC = () => {
                 <strong>Live System:</strong> Referral codes are validated through the smart contract system. 
                 When someone uses your code, both parties receive REFT tokens instantly via blockchain transaction.
                 {demoMode && ' Demo codes provide a safe way to test the system with real smart contract interactions.'}
-              </p>
+              {demoMode && ' The demo code provides a safe way to test the system with real smart contract interactions.'}
             </div>
           </div>
         )}
