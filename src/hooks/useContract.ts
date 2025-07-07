@@ -12,6 +12,7 @@ export const useContract = () => {
   const [events, setEvents] = useState<ContractEvent[]>([]);
   const [contractsDeployed, setContractsDeployed] = useState(false);
   const [frontendMode, setFrontendMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
   const eventListenersRef = useRef<{ [key: string]: any }>({});
   const contractCheckRef = useRef<boolean>(false);
   const toastShownRef = useRef<Set<string>>(new Set());
@@ -83,7 +84,7 @@ export const useContract = () => {
     return 'Transaction failed. Please try again.';
   }, []);
 
-  // Check if contracts are deployed and get frontend mode
+  // Check if contracts are deployed and get modes
   useEffect(() => {
     const checkContracts = async () => {
       if (!provider || !isCorrectNetwork || contractCheckRef.current) return;
@@ -98,7 +99,7 @@ export const useContract = () => {
         setContractsDeployed(deployed);
         
         if (deployed) {
-          // Check if frontend mode is enabled
+          // Check contract modes
           const contract = new ethers.Contract(
             CONTRACT_CONFIG.referralSystemAddress,
             REFERRAL_SYSTEM_ABI,
@@ -106,17 +107,23 @@ export const useContract = () => {
           );
           
           try {
-            const isFrontendMode = await contract.frontendMode();
+            const [isFrontendMode, isDemoMode] = await Promise.all([
+              contract.frontendMode(),
+              contract.demoMode()
+            ]);
+            
             setFrontendMode(isFrontendMode);
+            setDemoMode(isDemoMode);
             
             console.log('✅ Contracts successfully detected at:');
             console.log('ReferralSystem:', CONTRACT_CONFIG.referralSystemAddress);
             console.log('ReferralToken:', CONTRACT_CONFIG.referralTokenAddress);
             console.log('Frontend Mode:', isFrontendMode ? 'Enabled' : 'Disabled');
+            console.log('Demo Mode:', isDemoMode ? 'Enabled' : 'Disabled');
             
             const toastKey = 'contracts-connected';
             if (!toastShownRef.current.has(toastKey)) {
-              toast.success(`Smart contracts connected! Frontend mode: ${isFrontendMode ? 'Enabled' : 'Disabled'}`, {
+              toast.success(`Smart contracts connected! Demo codes available: ${isDemoMode ? 'Yes' : 'No'}`, {
                 duration: 3000,
                 icon: '🎉',
                 id: toastKey,
@@ -124,8 +131,9 @@ export const useContract = () => {
               toastShownRef.current.add(toastKey);
             }
           } catch (error) {
-            console.warn('Could not check frontend mode:', error);
+            console.warn('Could not check contract modes:', error);
             setFrontendMode(false);
+            setDemoMode(false);
           }
         } else {
           const toastKey = 'contracts-not-found';
@@ -221,8 +229,8 @@ export const useContract = () => {
     }
   }, [signer, address, contractsDeployed, frontendMode, getReferralSystemContract, handleContractError]);
 
-  // Professional referral code validation service
-  const validateReferralCode = useCallback(async (code: string): Promise<{ valid: boolean; referrerAddress?: string }> => {
+  // Enhanced referral code validation service
+  const validateReferralCode = useCallback(async (code: string): Promise<{ valid: boolean; referrerAddress?: string; isDemoCode?: boolean }> => {
     // Input validation
     if (!code || typeof code !== 'string') {
       return { valid: false };
@@ -236,14 +244,22 @@ export const useContract = () => {
 
     const normalizedCode = code.trim().toUpperCase();
 
-    // If contracts are deployed and frontend mode is enabled, check the contract
-    if (contractsDeployed && frontendMode) {
+    // If contracts are deployed, check the contract
+    if (contractsDeployed) {
       const contract = getReferralSystemContract();
       if (contract) {
         try {
-          const referrerAddress = await contract.getReferrerFromCode(normalizedCode);
+          const [referrerAddress, isDemoCodeResult] = await Promise.all([
+            contract.getReferrerFromCode(normalizedCode),
+            contract.isDemoCode(normalizedCode)
+          ]);
+          
           if (referrerAddress && referrerAddress !== ethers.ZeroAddress) {
-            return { valid: true, referrerAddress };
+            return { 
+              valid: true, 
+              referrerAddress, 
+              isDemoCode: isDemoCodeResult 
+            };
           }
         } catch (error) {
           console.error('Error validating referral code on contract:', error);
@@ -251,23 +267,8 @@ export const useContract = () => {
       }
     }
 
-    // Professional demo codes with realistic addresses (fallback for testing)
-    const professionalDemoCodes: Record<string, string> = {
-      'REF_ABC123': '0x742d35Cc6634C0532925a3b8D4C9db96590c6C87',
-      'REF_DEF456': '0x8ba1f109551bD432803012645Hac136c9c1659',
-      'REF_GHI789': '0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5',
-      'REF_JKL012': '0x2546BcD3c84621e976D8185a91A922aE77ECEc30',
-      'REF_MNO345': '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-      'REF_PQR678': '0x8ba1f109551bD432803012645Hac136c9c16592',
-    };
-
-    if (professionalDemoCodes[normalizedCode]) {
-      const demoAddress = professionalDemoCodes[normalizedCode];
-      return { valid: true, referrerAddress: demoAddress };
-    }
-
     return { valid: false };
-  }, [contractsDeployed, frontendMode, getReferralSystemContract]);
+  }, [contractsDeployed, getReferralSystemContract]);
 
   const getUserData = useCallback(async (userAddress: string): Promise<User | null> => {
     const contract = getReferralSystemContract();
@@ -372,9 +373,10 @@ export const useContract = () => {
       }
 
       // Pre-flight checks
-      const [hasBeenReferred, isPaused] = await Promise.all([
+      const [hasBeenReferred, isPaused, contractBalance] = await Promise.all([
         contract.hasBeenReferred(address),
-        contract.paused()
+        contract.paused(),
+        contract.getContractBalance()
       ]);
 
       if (isPaused) {
@@ -391,6 +393,19 @@ export const useContract = () => {
           duration: 4000,
           icon: '⚠️',
           id: 'already-referred',
+        });
+        return false;
+      }
+
+      // Check if contract has enough tokens for rewards
+      const [refReward, reeReward] = await contract.getRewardConfig();
+      const totalRewardNeeded = refReward + reeReward;
+      
+      if (contractBalance < totalRewardNeeded) {
+        toast.error('Contract does not have enough tokens for rewards. Please contact support.', {
+          duration: 5000,
+          icon: '💰',
+          id: 'insufficient-balance',
         });
         return false;
       }
@@ -417,7 +432,11 @@ export const useContract = () => {
       
       const receipt = await tx.wait();
       
-      toast.success(`Referral processed successfully! 🎉\nYou earned 500 REFT tokens!`, {
+      const rewardMessage = validation.isDemoCode 
+        ? `Referral processed successfully! 🎉\nYou earned 500 REFT tokens!\n(Demo referral - referrer gets virtual rewards)`
+        : `Referral processed successfully! 🎉\nYou earned 500 REFT tokens!\nReferrer earned 1000 REFT tokens!`;
+      
+      toast.success(rewardMessage, {
         duration: 6000,
         icon: '🎊',
         id: processingToastId,
@@ -692,6 +711,7 @@ export const useContract = () => {
     events,
     contractsDeployed,
     frontendMode,
+    demoMode,
     generateReferralCode,
     processReferral,
     getReferralHistory,

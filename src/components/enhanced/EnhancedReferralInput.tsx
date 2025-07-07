@@ -10,7 +10,8 @@ import {
   Info,
   HelpCircle,
   Shield,
-  Zap
+  Zap,
+  Star
 } from 'lucide-react';
 import { useContract } from '../../hooks/useContract';
 import { CONTRACT_CONFIG } from '../../config/contracts';
@@ -22,7 +23,7 @@ import toast from 'react-hot-toast';
 export const EnhancedReferralInput: React.FC = () => {
   const [referralCode, setReferralCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
-  const { processReferral, loading, contractsDeployed, validateReferralCode } = useContract();
+  const { processReferral, loading, contractsDeployed, demoMode, validateReferralCode } = useContract();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,22 +60,69 @@ export const EnhancedReferralInput: React.FC = () => {
   const isCodeValid = referralCode.trim().length >= 6;
   const isCodeFormatValid = /^REF_[A-F0-9]{6}$/i.test(referralCode.trim());
 
-  // Professional demo codes
+  // Professional demo codes with enhanced descriptions
   const professionalDemoCodes = [
-    { code: 'REF_ABC123', description: 'Demo Code #1' },
-    { code: 'REF_DEF456', description: 'Demo Code #2' },
-    { code: 'REF_GHI789', description: 'Demo Code #3' },
-    { code: 'REF_JKL012', description: 'Demo Code #4' },
-    { code: 'REF_MNO345', description: 'Demo Code #5' },
-    { code: 'REF_PQR678', description: 'Demo Code #6' },
+    { 
+      code: 'REF_ABC123', 
+      description: 'Demo Alpha',
+      status: 'Active',
+      rewards: '1000 REFT'
+    },
+    { 
+      code: 'REF_DEF456', 
+      description: 'Demo Beta',
+      status: 'Active',
+      rewards: '1000 REFT'
+    },
+    { 
+      code: 'REF_GHI789', 
+      description: 'Demo Gamma',
+      status: 'Active',
+      rewards: '1000 REFT'
+    },
+    { 
+      code: 'REF_JKL012', 
+      description: 'Demo Delta',
+      status: 'Active',
+      rewards: '1000 REFT'
+    },
+    { 
+      code: 'REF_MNO345', 
+      description: 'Demo Epsilon',
+      status: 'Active',
+      rewards: '1000 REFT'
+    },
+    { 
+      code: 'REF_PQR678', 
+      description: 'Demo Zeta',
+      status: 'Active',
+      rewards: '1000 REFT'
+    },
   ];
 
-  const handleDemoCodeClick = (code: string) => {
+  const handleDemoCodeClick = async (code: string) => {
     setReferralCode(code);
-    toast.success(`Demo code ${code} selected!`, {
-      duration: 2000,
-      icon: '🎯',
-    });
+    
+    // Validate the demo code
+    if (contractsDeployed) {
+      const validation = await validateReferralCode(code);
+      if (validation.valid) {
+        toast.success(`Demo code ${code} selected! ${validation.isDemoCode ? '(Demo Mode)' : ''}`, {
+          duration: 2000,
+          icon: '🎯',
+        });
+      } else {
+        toast.error(`Demo code ${code} is not available in the contract`, {
+          duration: 3000,
+          icon: '⚠️',
+        });
+      }
+    } else {
+      toast.success(`Demo code ${code} selected!`, {
+        duration: 2000,
+        icon: '🎯',
+      });
+    }
   };
 
   return (
@@ -94,9 +142,14 @@ export const EnhancedReferralInput: React.FC = () => {
             </p>
           </div>
         </div>
-        {contractsDeployed && (
-          <StatusBadge status="success" text="Live Contract" size="sm" />
-        )}
+        <div className="flex items-center space-x-2">
+          {contractsDeployed && (
+            <StatusBadge status="success" text="Live Contract" size="sm" />
+          )}
+          {demoMode && (
+            <StatusBadge status="pending" text="Demo Mode" size="sm" />
+          )}
+        </div>
       </div>
 
       {/* Contract Status */}
@@ -110,6 +163,7 @@ export const EnhancedReferralInput: React.FC = () => {
               </h4>
               <p className="text-sm text-green-700 dark:text-green-300 mb-3">
                 Your referral system is live on Sepolia testnet. Real REFT tokens will be distributed instantly.
+                {demoMode && ' Demo codes are available for testing!'}
               </p>
               <Tooltip content="View contract on Etherscan">
                 <button
@@ -140,39 +194,54 @@ export const EnhancedReferralInput: React.FC = () => {
       )}
 
       {/* Professional Demo Codes Section */}
-      <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl">
-        <div className="flex items-start space-x-3">
-          <HelpCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
-              Professional Demo Codes
-            </h4>
-            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-              Try these professional demo codes to test the referral system:
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-              {professionalDemoCodes.map((demo) => (
-                <button
-                  key={demo.code}
-                  onClick={() => handleDemoCodeClick(demo.code)}
-                  className="bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 px-3 py-2 rounded-lg font-mono text-blue-800 dark:text-blue-200 transition-colors text-left"
-                >
-                  <div className="font-bold">{demo.code}</div>
-                  <div className="text-xs opacity-75">{demo.description}</div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-600">
-              <div className="flex items-start space-x-2">
-                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  <strong>Production Note:</strong> In a live environment, referral codes would be managed by a secure backend service with proper validation and user mapping.
-                </p>
+      {demoMode && (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl">
+          <div className="flex items-start space-x-3">
+            <Star className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                Professional Demo Codes Available
+              </h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                Try these professional demo codes to test the referral system with real smart contract integration:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                {professionalDemoCodes.map((demo) => (
+                  <button
+                    key={demo.code}
+                    onClick={() => handleDemoCodeClick(demo.code)}
+                    className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-3 py-3 rounded-lg border border-blue-200 dark:border-blue-600 text-left transition-all duration-200 hover:shadow-md"
+                  >
+                    <div className="font-bold text-blue-800 dark:text-blue-200 font-mono text-xs">
+                      {demo.code}
+                    </div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      {demo.description}
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        {demo.status}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Earn 500 REFT
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-600">
+                <div className="flex items-start space-x-2">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                    <strong>Live Demo Mode:</strong> These codes are built into the smart contract and work with real blockchain transactions. 
+                    Demo referrers receive virtual rewards while you get real REFT tokens!
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Enhanced Referral Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -295,6 +364,7 @@ export const EnhancedReferralInput: React.FC = () => {
               <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                 <strong>Live System:</strong> Referral codes are validated through the smart contract system. 
                 When someone uses your code, both parties receive REFT tokens instantly via blockchain transaction.
+                {demoMode && ' Demo codes provide a safe way to test the system with real smart contract interactions.'}
               </p>
             </div>
           </div>

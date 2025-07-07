@@ -33,6 +33,9 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     // Frontend mode - allows direct user interactions for testing
     bool public frontendMode;
     
+    // Demo mode - enables built-in demo codes
+    bool public demoMode;
+    
     // Enum for referral types
     enum ReferralType {
         REFERRER,
@@ -59,6 +62,9 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     mapping(string => address) public referralCodeToAddress;
     mapping(address => string) public addressToReferralCode;
     
+    // Demo referral codes (for testing)
+    mapping(string => address) public demoReferralCodes;
+    
     // Events
     event ReferralProcessed(
         address indexed referee,
@@ -80,7 +86,9 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     event MinReferralIntervalUpdated(uint256 newInterval);
     event MaxReferralsPerUserUpdated(uint256 newMaxReferrals);
     event FrontendModeUpdated(bool enabled);
+    event DemoModeUpdated(bool enabled);
     event ReferralCodeRegistered(address indexed user, string referralCode);
+    event DemoCodeAdded(string referralCode, address referrer);
     
     // Errors
     error InvalidAddress();
@@ -119,11 +127,55 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         minReferralInterval = _minReferralInterval;
         maxReferralsPerUser = 100; // Default maximum referrals
         frontendMode = true; // Enable frontend mode by default for testing
+        demoMode = true; // Enable demo mode by default for testing
         
         // Setup roles
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(BACKEND_ROLE, _backendWallet);
         _grantRole(BACKEND_ROLE, msg.sender); // Owner also gets backend role
+        
+        // Initialize demo referral codes
+        _initializeDemoCodes();
+    }
+    
+    /**
+     * @dev Initialize demo referral codes for testing
+     */
+    function _initializeDemoCodes() internal {
+        // Create demo addresses (deterministic based on code)
+        address demo1 = address(uint160(uint256(keccak256("DEMO_REF_ABC123"))));
+        address demo2 = address(uint160(uint256(keccak256("DEMO_REF_DEF456"))));
+        address demo3 = address(uint160(uint256(keccak256("DEMO_REF_GHI789"))));
+        address demo4 = address(uint160(uint256(keccak256("DEMO_REF_JKL012"))));
+        address demo5 = address(uint160(uint256(keccak256("DEMO_REF_MNO345"))));
+        address demo6 = address(uint160(uint256(keccak256("DEMO_REF_PQR678"))));
+        
+        demoReferralCodes["REF_ABC123"] = demo1;
+        demoReferralCodes["REF_DEF456"] = demo2;
+        demoReferralCodes["REF_GHI789"] = demo3;
+        demoReferralCodes["REF_JKL012"] = demo4;
+        demoReferralCodes["REF_MNO345"] = demo5;
+        demoReferralCodes["REF_PQR678"] = demo6;
+    }
+    
+    /**
+     * @dev Add demo referral code (only owner)
+     * @param _referralCode The referral code
+     * @param _referrer The referrer address
+     */
+    function addDemoCode(string memory _referralCode, address _referrer) external onlyOwner {
+        if (_referrer == address(0)) revert InvalidAddress();
+        demoReferralCodes[_referralCode] = _referrer;
+        emit DemoCodeAdded(_referralCode, _referrer);
+    }
+    
+    /**
+     * @dev Toggle demo mode (only owner)
+     * @param _enabled Whether to enable demo mode
+     */
+    function setDemoMode(bool _enabled) external onlyOwner {
+        demoMode = _enabled;
+        emit DemoModeUpdated(_enabled);
     }
     
     /**
@@ -154,7 +206,7 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     function processReferralByCode(string memory _referralCode) external nonReentrant whenNotPaused {
         if (!frontendMode) revert UnauthorizedBackend();
         
-        address referrer = referralCodeToAddress[_referralCode];
+        address referrer = _getReferrerFromCode(_referralCode);
         if (referrer == address(0)) revert InvalidReferralCode();
         
         _processReferralInternal(msg.sender, referrer);
@@ -178,6 +230,26 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @dev Internal function to get referrer from code (checks both user and demo codes)
+     * @param _referralCode The referral code
+     * @return The referrer address
+     */
+    function _getReferrerFromCode(string memory _referralCode) internal view returns (address) {
+        // First check user-registered codes
+        address userReferrer = referralCodeToAddress[_referralCode];
+        if (userReferrer != address(0)) {
+            return userReferrer;
+        }
+        
+        // Then check demo codes if demo mode is enabled
+        if (demoMode) {
+            return demoReferralCodes[_referralCode];
+        }
+        
+        return address(0);
+    }
+    
+    /**
      * @dev Internal function to process referrals
      * @param _referee Address of the referee
      * @param _referrer Address of the referrer
@@ -190,24 +262,24 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         // Check if referee has already been referred
         if (hasBeenReferred[_referee]) revert UserAlreadyReferred();
         
-        // Check referral interval for referrer
-        if (block.timestamp < lastReferralTime[_referrer] + minReferralInterval) {
+        // Check referral interval for referrer (only for real users, not demo addresses)
+        if (!_isDemoAddress(_referrer) && block.timestamp < lastReferralTime[_referrer] + minReferralInterval) {
             revert ReferralTooSoon();
         }
         
-        // Check maximum referrals per user
-        if (totalReferrals[_referrer] >= maxReferralsPerUser) {
+        // Check maximum referrals per user (only for real users, not demo addresses)
+        if (!_isDemoAddress(_referrer) && totalReferrals[_referrer] >= maxReferralsPerUser) {
             revert MaxReferralsExceeded();
         }
         
         // Mark referee as referred
         hasBeenReferred[_referee] = true;
         
-        // Update referrer's last referral time
-        lastReferralTime[_referrer] = block.timestamp;
-        
-        // Increment total referrals for referrer
-        totalReferrals[_referrer]++;
+        // Update referrer's last referral time (only for real users)
+        if (!_isDemoAddress(_referrer)) {
+            lastReferralTime[_referrer] = block.timestamp;
+            totalReferrals[_referrer]++;
+        }
         
         // Create referral record
         Referral memory newReferral = Referral({
@@ -230,6 +302,27 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @dev Check if an address is a demo address
+     * @param _address The address to check
+     * @return True if it's a demo address
+     */
+    function _isDemoAddress(address _address) internal view returns (bool) {
+        if (!demoMode) return false;
+        
+        // Check if this address matches any demo code address
+        if (_address == demoReferralCodes["REF_ABC123"] ||
+            _address == demoReferralCodes["REF_DEF456"] ||
+            _address == demoReferralCodes["REF_GHI789"] ||
+            _address == demoReferralCodes["REF_JKL012"] ||
+            _address == demoReferralCodes["REF_MNO345"] ||
+            _address == demoReferralCodes["REF_PQR678"]) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
      * @dev Internal function to distribute rewards
      * @param _referrer Address of the referrer
      * @param _referee Address of the referee
@@ -241,26 +334,26 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
             revert InsufficientTokenBalance();
         }
         
-        // Transfer rewards
-        referralToken.transfer(_referrer, referrerReward);
+        // Transfer rewards (only to real users, not demo addresses)
+        if (!_isDemoAddress(_referrer)) {
+            referralToken.transfer(_referrer, referrerReward);
+            totalRewardsEarned[_referrer] += referrerReward;
+            emit RewardsDistributed(_referrer, referrerReward, ReferralType.REFERRER);
+        }
+        
+        // Always reward the referee (real user)
         referralToken.transfer(_referee, refereeReward);
-        
-        // Update total rewards earned
-        totalRewardsEarned[_referrer] += referrerReward;
         totalRewardsEarned[_referee] += refereeReward;
-        
-        // Emit reward distribution events
-        emit RewardsDistributed(_referrer, referrerReward, ReferralType.REFERRER);
         emit RewardsDistributed(_referee, refereeReward, ReferralType.REFEREE);
     }
     
     /**
-     * @dev Get referrer address from referral code
+     * @dev Get referrer address from referral code (public function)
      * @param _referralCode The referral code
      * @return The address of the referrer
      */
     function getReferrerFromCode(string memory _referralCode) external view returns (address) {
-        return referralCodeToAddress[_referralCode];
+        return _getReferrerFromCode(_referralCode);
     }
     
     /**
@@ -270,6 +363,15 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
      */
     function getReferralCode(address _user) external view returns (string memory) {
         return addressToReferralCode[_user];
+    }
+    
+    /**
+     * @dev Check if a referral code is a demo code
+     * @param _referralCode The referral code to check
+     * @return True if it's a demo code
+     */
+    function isDemoCode(string memory _referralCode) external view returns (bool) {
+        return demoMode && demoReferralCodes[_referralCode] != address(0);
     }
     
     /**
@@ -437,10 +539,10 @@ contract ReferralSystem is Ownable, AccessControl, ReentrancyGuard, Pausable {
         return (referrerReward, refereeReward);
     }
     
-    // /**
-    //  * @dev Get contract configuration
-    //  * @return Configuration values
-    //  */
+    /**
+     * @dev Get contract configuration
+     * @return Configuration values
+     */
     function getConfig() external view returns (
         uint256 minInterval,
         uint256 maxReferrals,

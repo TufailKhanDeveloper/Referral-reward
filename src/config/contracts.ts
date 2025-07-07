@@ -62,22 +62,29 @@ export const REFERRAL_SYSTEM_ABI = [
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function BACKEND_ROLE() view returns (bytes32)',
   'function frontendMode() view returns (bool)',
+  'function demoMode() view returns (bool)',
   'function getReferrerFromCode(string referralCode) view returns (address)',
   'function getReferralCode(address user) view returns (string)',
   'function referralCodeToAddress(string) view returns (address)',
   'function addressToReferralCode(address) view returns (string)',
+  'function demoReferralCodes(string) view returns (address)',
+  'function isDemoCode(string referralCode) view returns (bool)',
   
   // Write functions
   'function processReferral(address referee, address referrer)',
   'function processReferralByCode(string referralCode)',
   'function registerReferralCode(string referralCode)',
   'function setFrontendMode(bool enabled)',
+  'function setDemoMode(bool enabled)',
+  'function addDemoCode(string referralCode, address referrer)',
   
   // Events
   'event ReferralProcessed(address indexed referee, address indexed referrer, uint256 timestamp)',
   'event RewardsDistributed(address indexed user, uint256 amount, uint8 referralType)',
   'event ReferralCodeRegistered(address indexed user, string referralCode)',
   'event FrontendModeUpdated(bool enabled)',
+  'event DemoModeUpdated(bool enabled)',
+  'event DemoCodeAdded(string referralCode, address referrer)',
 ];
 
 export const REFERRAL_TOKEN_ABI = [
@@ -122,7 +129,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   'AccessControlUnauthorizedAccount': 'You do not have permission to perform this action.',
   'UnauthorizedMinter': 'Unauthorized to mint tokens.',
   'ExceedsMaxSupply': 'Would exceed maximum token supply.',
-  'InvalidReferralCode': 'Invalid or non-existent referral code.',
+  'InvalidReferralCode': 'Invalid or non-existent referral code. Please check the code and try again.',
   'ReferralCodeAlreadyExists': 'This referral code is already registered.',
   
   // ERC20 errors
@@ -153,6 +160,7 @@ export const ERROR_SELECTORS: Record<string, string> = {
   '0x356680b7': 'InsufficientTokenBalance',
   '0x8baa579f': 'InvalidReferralCode',
   '0x9b96eece': 'ReferralCodeAlreadyExists',
+  '0xe55b4629': 'InvalidReferralCode', // This is the error you're getting
 };
 
 // Function to decode error by selector
