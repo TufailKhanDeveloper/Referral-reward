@@ -11,7 +11,8 @@ import {
   HelpCircle,
   Shield,
   Zap,
-  Star
+  Star,
+  AlertCircle
 } from 'lucide-react';
 import { useContract } from '../../hooks/useContract';
 import { CONTRACT_CONFIG } from '../../config/contracts';
@@ -66,37 +67,37 @@ export const EnhancedReferralInput: React.FC = () => {
       code: 'REF_ABC123', 
       description: 'Demo Alpha',
       status: 'Active',
-      rewards: '1000 REFT'
+      rewards: '500 REFT'
     },
     { 
       code: 'REF_DEF456', 
       description: 'Demo Beta',
       status: 'Active',
-      rewards: '1000 REFT'
+      rewards: '500 REFT'
     },
     { 
       code: 'REF_GHI789', 
       description: 'Demo Gamma',
       status: 'Active',
-      rewards: '1000 REFT'
+      rewards: '500 REFT'
     },
     { 
       code: 'REF_JKL012', 
       description: 'Demo Delta',
       status: 'Active',
-      rewards: '1000 REFT'
+      rewards: '500 REFT'
     },
     { 
       code: 'REF_MNO345', 
       description: 'Demo Epsilon',
       status: 'Active',
-      rewards: '1000 REFT'
+      rewards: '500 REFT'
     },
     { 
       code: 'REF_PQR678', 
       description: 'Demo Zeta',
       status: 'Active',
-      rewards: '1000 REFT'
+      rewards: '500 REFT'
     },
   ];
 
@@ -193,6 +194,28 @@ export const EnhancedReferralInput: React.FC = () => {
         </div>
       )}
 
+      {/* Demo Code Issue Warning */}
+      {contractsDeployed && !demoMode && (
+        <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-xl">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">
+                Demo Codes Not Available
+              </h4>
+              <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
+                The deployed contract doesn't have demo mode enabled. You'll need to:
+              </p>
+              <ul className="text-sm text-orange-700 dark:text-orange-300 list-disc list-inside space-y-1">
+                <li>Use a real referral code from another user</li>
+                <li>Or ask the contract owner to enable demo mode</li>
+                <li>Or deploy the updated contract with demo codes</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Professional Demo Codes Section */}
       {demoMode && (
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl">
@@ -223,7 +246,7 @@ export const EnhancedReferralInput: React.FC = () => {
                         {demo.status}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Earn 500 REFT
+                        Earn {demo.rewards}
                       </span>
                     </div>
                   </button>

@@ -28,24 +28,25 @@ export const SEPOLIA_CHAIN_CONFIG = {
   blockExplorerUrls: [CONTRACT_CONFIG.blockExplorer],
 };
 
+// Updated ABI based on your actual deployed contract
 export const REFERRAL_SYSTEM_ABI = [
-  // Custom Errors - IMPORTANT: These are needed to decode revert reasons
+  // Custom Errors - IMPORTANT: These match your actual contract
   'error AccessControlBadConfirmation()',
   'error AccessControlUnauthorizedAccount(address account, bytes32 neededRole)',
   'error InsufficientTokenBalance()',
   'error InvalidAddress()',
   'error InvalidAmount()',
+  'error InvalidReferralCode()',
   'error MaxReferralsExceeded()',
   'error OwnableInvalidOwner(address owner)',
   'error OwnableUnauthorizedAccount(address account)',
+  'error ReferralCodeAlreadyExists()',
   'error ReferralTooSoon()',
   'error SelfReferralNotAllowed()',
   'error UnauthorizedBackend()',
   'error UserAlreadyReferred()',
-  'error InvalidReferralCode()',
-  'error ReferralCodeAlreadyExists()',
 
-  // Read functions
+  // Read functions - Based on your actual ABI
   'function getReferrals(address user) view returns (tuple(address referee, address referrer, uint256 timestamp, uint256 referrerReward, uint256 refereeReward)[])',
   'function getReferralCount(address user) view returns (uint256)',
   'function isEligibleForReferral(address user) view returns (bool)',
@@ -129,7 +130,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   'AccessControlUnauthorizedAccount': 'You do not have permission to perform this action.',
   'UnauthorizedMinter': 'Unauthorized to mint tokens.',
   'ExceedsMaxSupply': 'Would exceed maximum token supply.',
-  'InvalidReferralCode': 'Invalid or non-existent referral code. Please check the code and try again.',
+  'InvalidReferralCode': 'Invalid or non-existent referral code. Please check the code and try again, or use one of the demo codes.',
   'ReferralCodeAlreadyExists': 'This referral code is already registered.',
   
   // ERC20 errors
@@ -148,7 +149,7 @@ export const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   'AccessControlBadConfirmation': 'Access control confirmation failed.',
 };
 
-// Error selector mapping for quick lookup
+// Error selector mapping for quick lookup - Updated with correct selectors
 export const ERROR_SELECTORS: Record<string, string> = {
   '0xe4455cae': 'UnauthorizedBackend',
   '0xd92e233d': 'InvalidAddress',
@@ -158,9 +159,8 @@ export const ERROR_SELECTORS: Record<string, string> = {
   '0x8d6ea8be': 'ReferralTooSoon',
   '0x7d3d5b0a': 'MaxReferralsExceeded',
   '0x356680b7': 'InsufficientTokenBalance',
-  '0x8baa579f': 'InvalidReferralCode',
-  '0x9b96eece': 'ReferralCodeAlreadyExists',
   '0xe55b4629': 'InvalidReferralCode', // This is the error you're getting
+  '0x9b96eece': 'ReferralCodeAlreadyExists',
 };
 
 // Function to decode error by selector

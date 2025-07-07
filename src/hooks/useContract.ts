@@ -353,7 +353,7 @@ export const useContract = () => {
       // Validate referral code
       const validation = await validateReferralCode(referralCode);
       if (!validation.valid || !validation.referrerAddress) {
-        toast.error('Invalid referral code. Please check the code and try again.', {
+        toast.error('Invalid referral code. Please check the code and try again, or use one of the demo codes.', {
           duration: 5000,
           icon: '❌',
           id: 'invalid-referral-code',
