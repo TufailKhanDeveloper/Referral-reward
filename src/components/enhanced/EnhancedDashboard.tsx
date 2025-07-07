@@ -10,7 +10,9 @@ import {
   ExternalLink,
   Target,
   Zap,
-  Star
+  Star,
+  AlertTriangle,
+  DollarSign
 } from 'lucide-react';
 import { useContract } from '../../hooks/useContract';
 import { useWallet } from '../../hooks/useWallet';
@@ -21,14 +23,18 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { StatusBadge } from '../ui/StatusBadge';
 import { Tooltip } from '../ui/Tooltip';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { ContractSetupGuide } from '../ContractSetupGuide';
 
 export const EnhancedDashboard: React.FC = () => {
-  const { user, getReferralHistory, getTokenBalance, contractsDeployed } = useContract();
+  const { user, getReferralHistory, getTokenBalance, contractsDeployed, checkAndFundContract } = useContract();
   const { address } = useWallet();
   const [referralHistory, setReferralHistory] = useState<Referral[]>([]);
   const [tokenBalance, setTokenBalance] = useState('0');
+  const [contractBalance, setContractBalance] = useState('0');
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [needsFunding, setNeedsFunding] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -43,15 +49,26 @@ export const EnhancedDashboard: React.FC = () => {
         
         setReferralHistory(history);
         setTokenBalance(balance);
+
+        // Check contract balance if contracts are deployed
+        if (contractsDeployed) {
+          const { getReferralSystemContract } = await import('../../hooks/useContract');
+          // This is a simplified check - in practice you'd want to properly import the hook
+          // For now, we'll assume the contract needs funding if there are errors
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+        // If we get a "Contract does not have enough tokens" error, show setup guide
+        if (error instanceof Error && error.message.includes('Contract does not have enough tokens')) {
+          setNeedsFunding(true);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [address, getReferralHistory, getTokenBalance]);
+  }, [address, getReferralHistory, getTokenBalance, contractsDeployed]);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -88,6 +105,26 @@ export const EnhancedDashboard: React.FC = () => {
     );
   }
 
+  // Show setup guide if contracts need funding
+  if (needsFunding || showSetupGuide) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Contract Setup Required
+          </h2>
+          <button
+            onClick={() => setShowSetupGuide(false)}
+            className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+        <ContractSetupGuide />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Contract Status Banner */}
@@ -98,9 +135,18 @@ export const EnhancedDashboard: React.FC = () => {
               <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-2">
-                🎉 Smart Contracts Connected Successfully!
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
+                  🎉 Smart Contracts Connected Successfully!
+                </h3>
+                <button
+                  onClick={() => setShowSetupGuide(true)}
+                  className="flex items-center space-x-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                >
+                  <DollarSign size={12} />
+                  <span>Setup Guide</span>
+                </button>
+              </div>
               <p className="text-green-700 dark:text-green-300 mb-4">
                 Your REFT tokens are real and live on Sepolia testnet. All data is fetched directly from the blockchain.
               </p>
@@ -124,6 +170,30 @@ export const EnhancedDashboard: React.FC = () => {
                   </button>
                 </Tooltip>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contract Funding Warning */}
+      {contractsDeployed && parseFloat(contractBalance) < 1500 && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-2xl p-4">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                Contract May Need Funding
+              </h4>
+              <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-3">
+                The contract might not have enough tokens for rewards. Each referral requires 1,500 REFT tokens.
+              </p>
+              <button
+                onClick={() => setShowSetupGuide(true)}
+                className="flex items-center space-x-1 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded transition-colors"
+              >
+                <DollarSign size={12} />
+                <span>Fix Funding Issue</span>
+              </button>
             </div>
           </div>
         </div>

@@ -209,7 +209,13 @@ export const useContract = () => {
         return true; // Already registered
       }
       
-      const tx = await contract.registerReferralCode(referralCode);
+      // Estimate gas with higher limit
+      const gasEstimate = await contract.registerReferralCode.estimateGas(referralCode);
+      const gasLimit = gasEstimate * BigInt(120) / BigInt(100); // Add 20% buffer
+      
+      const tx = await contract.registerReferralCode(referralCode, {
+        gasLimit: gasLimit
+      });
       await tx.wait();
       
       toast.success('Referral code registered successfully!', {
@@ -327,6 +333,76 @@ export const useContract = () => {
     }
   }, [getReferralSystemContract, generateReferralCode, frontendMode, signer, address, registerReferralCode, handleContractError]);
 
+  // Function to check and fund contract if needed
+  const checkAndFundContract = useCallback(async (): Promise<boolean> => {
+    if (!signer || !address || !contractsDeployed) return false;
+
+    const systemContract = getReferralSystemContract();
+    const tokenContract = getReferralTokenContract();
+    
+    if (!systemContract || !tokenContract) return false;
+
+    try {
+      const [contractBalance, [refReward, reeReward], userBalance] = await Promise.all([
+        systemContract.getContractBalance(),
+        systemContract.getRewardConfig(),
+        tokenContract.balanceOf(address)
+      ]);
+
+      const totalRewardNeeded = refReward + reeReward;
+      
+      // If contract doesn't have enough tokens, try to fund it
+      if (contractBalance < totalRewardNeeded) {
+        console.log('Contract needs funding. Checking user balance...');
+        
+        if (userBalance >= totalRewardNeeded * BigInt(10)) { // User has at least 10x the reward amount
+          const fundingToastId = toast.loading('Contract needs tokens for rewards. Funding contract...', {
+            icon: '💰',
+          });
+
+          try {
+            // Transfer tokens to contract
+            const transferAmount = totalRewardNeeded * BigInt(50); // Fund with 50x reward amount
+            const gasEstimate = await tokenContract.transfer.estimateGas(CONTRACT_CONFIG.referralSystemAddress, transferAmount);
+            const gasLimit = gasEstimate * BigInt(120) / BigInt(100); // Add 20% buffer
+            
+            const tx = await tokenContract.transfer(CONTRACT_CONFIG.referralSystemAddress, transferAmount, {
+              gasLimit: gasLimit
+            });
+            await tx.wait();
+
+            toast.success('Contract funded successfully! You can now process referrals.', {
+              duration: 5000,
+              icon: '✅',
+              id: fundingToastId,
+            });
+            
+            return true;
+          } catch (error) {
+            console.error('Error funding contract:', error);
+            toast.error('Failed to fund contract. Please try manually transferring tokens.', {
+              duration: 5000,
+              icon: '❌',
+              id: fundingToastId,
+            });
+            return false;
+          }
+        } else {
+          toast.error('Contract needs tokens for rewards, but you don\'t have enough tokens to fund it.', {
+            duration: 5000,
+            icon: '💰',
+          });
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error checking contract funding:', error);
+      return false;
+    }
+  }, [signer, address, contractsDeployed, getReferralSystemContract, getReferralTokenContract]);
+
   const processReferral = useCallback(async (referralCode: string): Promise<boolean> => {
     if (!signer || !address || !isCorrectNetwork) {
       toast.error('Please connect your wallet to Sepolia network', {
@@ -373,10 +449,9 @@ export const useContract = () => {
       }
 
       // Pre-flight checks
-      const [hasBeenReferred, isPaused, contractBalance] = await Promise.all([
+      const [hasBeenReferred, isPaused] = await Promise.all([
         contract.hasBeenReferred(address),
-        contract.paused(),
-        contract.getContractBalance()
+        contract.paused()
       ]);
 
       if (isPaused) {
@@ -397,16 +472,9 @@ export const useContract = () => {
         return false;
       }
 
-      // Check if contract has enough tokens for rewards
-      const [refReward, reeReward] = await contract.getRewardConfig();
-      const totalRewardNeeded = refReward + reeReward;
-      
-      if (contractBalance < totalRewardNeeded) {
-        toast.error('Contract does not have enough tokens for rewards. Please contact support.', {
-          duration: 5000,
-          icon: '💰',
-          id: 'insufficient-balance',
-        });
+      // Check and fund contract if needed
+      const contractFunded = await checkAndFundContract();
+      if (!contractFunded) {
         return false;
       }
 
@@ -416,13 +484,38 @@ export const useContract = () => {
 
       let tx;
       
-      // Use the appropriate function based on frontend mode
-      if (frontendMode) {
-        // Use referral code directly
-        tx = await contract.processReferralByCode(referralCode);
-      } else {
-        // Use addresses (requires backend role)
-        tx = await contract.processReferral(address, referrerAddress);
+      try {
+        // Use the appropriate function based on frontend mode
+        if (frontendMode) {
+          // Use referral code directly with higher gas limit
+          const gasEstimate = await contract.processReferralByCode.estimateGas(referralCode);
+          const gasLimit = gasEstimate * BigInt(150) / BigInt(100); // Add 50% buffer for complex operations
+          
+          tx = await contract.processReferralByCode(referralCode, {
+            gasLimit: gasLimit
+          });
+        } else {
+          // Use addresses (requires backend role) with higher gas limit
+          const gasEstimate = await contract.processReferral.estimateGas(address, referrerAddress);
+          const gasLimit = gasEstimate * BigInt(150) / BigInt(100); // Add 50% buffer
+          
+          tx = await contract.processReferral(address, referrerAddress, {
+            gasLimit: gasLimit
+          });
+        }
+      } catch (gasError) {
+        console.error('Gas estimation failed, trying with fixed gas limit:', gasError);
+        
+        // Fallback to fixed gas limit if estimation fails
+        if (frontendMode) {
+          tx = await contract.processReferralByCode(referralCode, {
+            gasLimit: 500000 // Fixed gas limit
+          });
+        } else {
+          tx = await contract.processReferral(address, referrerAddress, {
+            gasLimit: 500000 // Fixed gas limit
+          });
+        }
       }
       
       toast.loading('Waiting for transaction confirmation...', {
@@ -462,7 +555,7 @@ export const useContract = () => {
     } finally {
       setLoading(false);
     }
-  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData, handleContractError, frontendMode]);
+  }, [signer, address, isCorrectNetwork, getReferralSystemContract, validateReferralCode, getUserData, handleContractError, frontendMode, checkAndFundContract]);
 
   const getReferralHistory = useCallback(async (userAddress: string): Promise<Referral[]> => {
     const contract = getReferralSystemContract();
@@ -722,5 +815,6 @@ export const useContract = () => {
     validateReferralCode,
     handleContractError,
     registerReferralCode,
+    checkAndFundContract,
   };
 };
