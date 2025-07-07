@@ -235,7 +235,7 @@ event RewardAmountsUpdated(uint256 newReferrerReward, uint256 newRefereeReward);
 ### Live Demo
 
 The application is deployed and accessible at:
-**https://shiny-meerkat-bf162f.netlify.app**
+**https://tubular-biscochitos-e83bfa.netlify.app**
 
 ### Frontend Deployment
 
