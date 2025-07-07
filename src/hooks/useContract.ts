@@ -210,6 +210,7 @@ export const useContract = () => {
     // Generate a deterministic referral code based on address
     
     const contract = new ethers.Contract(
+    )
     return `REF_${hash.slice(2, 8).toUpperCase()}`;
   }, []);
 
