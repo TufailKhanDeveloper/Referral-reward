@@ -7,12 +7,13 @@ import { EnhancedReferralGenerator } from './components/enhanced/EnhancedReferra
 import { EnhancedReferralInput } from './components/enhanced/EnhancedReferralInput';
 import { Leaderboard } from './components/Leaderboard';
 import { RealTimeEvents } from './components/RealTimeEvents';
+import { ContractFundingHelper } from './components/ContractFundingHelper';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useWallet } from './hooks/useWallet';
 import { useContract } from './hooks/useContract';
-import { Users, Trophy, Gift, BarChart3, Activity, Sparkles, Heart, Coffee, Github, ExternalLink } from 'lucide-react';
+import { Users, Trophy, Gift, BarChart3, Activity, Sparkles, Heart, Coffee, Github, ExternalLink, DollarSign } from 'lucide-react';
 
-type Tab = 'dashboard' | 'referral' | 'leaderboard' | 'events';
+type Tab = 'dashboard' | 'referral' | 'leaderboard' | 'events' | 'funding';
 
 function App() {
   const { isConnected, address, isCorrectNetwork } = useWallet();
@@ -24,8 +25,9 @@ function App() {
   const tabs = [
     { id: 'dashboard' as Tab, label: 'Dashboard', icon: BarChart3, color: 'from-blue-500 to-blue-600' },
     { id: 'referral' as Tab, label: 'Referral', icon: Gift, color: 'from-green-500 to-green-600' },
+    { id: 'funding' as Tab, label: 'Funding', icon: DollarSign, color: 'from-purple-500 to-purple-600' },
     { id: 'leaderboard' as Tab, label: 'Leaderboard', icon: Trophy, color: 'from-yellow-500 to-yellow-600' },
-    { id: 'events' as Tab, label: 'Live Events', icon: Activity, color: 'from-purple-500 to-purple-600' },
+    { id: 'events' as Tab, label: 'Live Events', icon: Activity, color: 'from-pink-500 to-pink-600' },
   ];
 
   return (
@@ -195,6 +197,8 @@ function App() {
                     <EnhancedReferralInput />
                   </div>
                 )}
+                
+                {activeTab === 'funding' && <ContractFundingHelper />}
                 
                 {activeTab === 'leaderboard' && <Leaderboard />}
                 

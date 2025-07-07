@@ -23,7 +23,7 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { StatusBadge } from '../ui/StatusBadge';
 import { Tooltip } from '../ui/Tooltip';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { ContractSetupGuide } from '../ContractSetupGuide';
+import { ContractFundingHelper } from '../ContractFundingHelper';
 
 export const EnhancedDashboard: React.FC = () => {
   const { user, getReferralHistory, getTokenBalance, contractsDeployed, checkAndFundContract } = useContract();
@@ -106,21 +106,15 @@ export const EnhancedDashboard: React.FC = () => {
   }
 
   // Show setup guide if contracts need funding
-  if (needsFunding || showSetupGuide) {
+  if (needsFunding) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Contract Setup Required
+            Contract Funding Required
           </h2>
-          <button
-            onClick={() => setShowSetupGuide(false)}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            Back to Dashboard
-          </button>
         </div>
-        <ContractSetupGuide />
+        <ContractFundingHelper />
       </div>
     );
   }
@@ -139,13 +133,6 @@ export const EnhancedDashboard: React.FC = () => {
                 <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
                   🎉 Smart Contracts Connected Successfully!
                 </h3>
-                <button
-                  onClick={() => setShowSetupGuide(true)}
-                  className="flex items-center space-x-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                >
-                  <DollarSign size={12} />
-                  <span>Setup Guide</span>
-                </button>
               </div>
               <p className="text-green-700 dark:text-green-300 mb-4">
                 Your REFT tokens are real and live on Sepolia testnet. All data is fetched directly from the blockchain.
@@ -187,13 +174,9 @@ export const EnhancedDashboard: React.FC = () => {
               <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-3">
                 The contract might not have enough tokens for rewards. Each referral requires 1,500 REFT tokens.
               </p>
-              <button
-                onClick={() => setShowSetupGuide(true)}
-                className="flex items-center space-x-1 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded transition-colors"
-              >
-                <DollarSign size={12} />
-                <span>Fix Funding Issue</span>
-              </button>
+              <div className="mt-4">
+                <ContractFundingHelper />
+              </div>
             </div>
           </div>
         </div>
